@@ -4,7 +4,7 @@
 //  x von -1 bis 1, y von -1 (oben) bis 1 (Boden). Outline wird vom
 //  Aufrufer gesetzt (lineWidth/strokeStyle), Farbe kommt aus o.color.
 // =====================================================================
-import { shadeHex as sh } from './game.js?v=0.8.3';
+import { shadeHex as sh } from './game.js?v=0.8.4';
 
 const TAU = Math.PI * 2;
 

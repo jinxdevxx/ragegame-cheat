@@ -6,6 +6,16 @@
 
 export const PATCH_NOTES = [
   {
+    version: '0.8.4',
+    date: '2026-11-26',
+    title: 'Echte Hanfpflanzen',
+    summary: 'Die Pflanzen auf der Easter-Egg-Karte sehen jetzt aus wie die klassische Hanfpflanze – sofort erkennbar.',
+    changes: [
+      'Jede Pflanze hat jetzt die typische Form: große, siebenfingrige Fächerblätter nach oben und zur Seite, dunkler Rand, helle Blattadern und eine Blüte mit orangen Härchen in der Mitte.',
+      'Performance unverändert flüssig: ausgemaxt ~52 FPS, Boden 0,2 ms pro Bild.',
+    ],
+  },
+  {
     version: '0.8.3',
     date: '2026-11-26',
     title: 'Plantage im Abendlicht',

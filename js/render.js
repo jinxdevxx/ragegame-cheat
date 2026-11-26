@@ -3,9 +3,9 @@
 //  Reihenfolge: Boden → Trümmer-Flecken → Schatten/Objekte/Monster
 //  (nach Tiefe sortiert) → Trümmer → Münzen → Effekte → Overlays
 // =====================================================================
-import { SPRITES, OUT } from './sprites.js?v=0.8.3';
-import { drawMonster } from './monster.js?v=0.8.3';
-import { shadeHex as sh, shadeHex } from './game.js?v=0.8.3';
+import { SPRITES, OUT } from './sprites.js?v=0.8.4';
+import { drawMonster } from './monster.js?v=0.8.4';
+import { shadeHex as sh, shadeHex } from './game.js?v=0.8.4';
 
 const TAU = Math.PI * 2;
 const STARS = Array.from({ length: 220 }, () => ({ x: Math.random(), y: Math.random(), s: Math.random() * 1.8 + 0.4, p: Math.random() * 0.6 + 0.1, tw: Math.random() * 6 }));
@@ -239,7 +239,7 @@ function make420Tile() {
   // Pflanzenreihen: zwei Reihen zwischen den Wegen, versetzt
   for (const y0 of rows) for (let x = (y0 / 256) % 2 ? 85 : 0; x < N + 85; x += 170) {
     const X = x + (rnd() - 0.5) * 14, Y = y0 + 186 + (rnd() - 0.5) * 8, u = 128 + rnd() * 18, sdd = rnd();
-    wrap(() => { const g = c.createRadialGradient(X + 12, Y + 16, 0, X + 12, Y + 16, u * 0.6); g.addColorStop(0, 'rgba(10,30,5,0.28)'); g.addColorStop(1, 'rgba(10,30,5,0)'); c.fillStyle = g; c.beginPath(); c.arc(X + 12, Y + 16, u * 0.6, 0, TAU); c.fill(); hempPlant(c, X, Y, u, sdd); });
+    wrap(() => hempPlant(c, X, Y + u * 0.15, u * 1.15, sdd));
   }
   return cv;
 }
@@ -288,19 +288,30 @@ function hempLeaflet(c, X, Y, L, W, ang) {
 }
 function hempLeaf(c, X, Y, size, rot, col, vein) {
   c.fillStyle = col;
-  const F = [[0, 1, 0.13], [0.42, 0.88, 0.12], [-0.42, 0.88, 0.12], [0.85, 0.66, 0.1], [-0.85, 0.66, 0.1], [1.3, 0.4, 0.075], [-1.3, 0.4, 0.075]];
+  const F = [[0, 1, 0.11], [0.45, 0.86, 0.1], [-0.45, 0.86, 0.1], [0.92, 0.64, 0.085], [-0.92, 0.64, 0.085], [1.4, 0.38, 0.065], [-1.4, 0.38, 0.065]];
   for (const [a, l, w] of F) hempLeaflet(c, X, Y, size * l, size * w, rot + a);
   if (vein) { c.strokeStyle = vein; c.lineWidth = Math.max(0.6, size * 0.025); c.beginPath(); for (const [a, l] of F) { c.moveTo(X, Y); c.lineTo(X + Math.cos(rot + a) * size * l * 0.92, Y + Math.sin(rot + a) * size * l * 0.92); } c.stroke(); }
 }
-// ganze Pflanze von oben: Fächerblätter im Kreis + Blüte (Cola) in der Mitte
+// ganze Pflanze in der typischen Hanf-Silhouette: große 7-Finger-Fächerblätter, nach oben und zur Seite gefächert
 function hempPlant(c, X, Y, u, seed) {
-  const rot = seed * TAU, dark = '#24611f', mid = '#3b8a2e', light = '#5aac3e';
-  c.fillStyle = 'rgba(15,40,10,0.18)'; c.beginPath(); c.arc(X + u * 0.06, Y + u * 0.08, u * 0.5, 0, TAU); c.fill();
-  for (let i = 0; i < 6; i++) hempLeaf(c, X, Y, u * 0.58, rot + i * TAU / 6, i % 2 ? dark : mid, 'rgba(160,220,120,0.35)');
-  for (let i = 0; i < 5; i++) hempLeaf(c, X, Y, u * 0.36, rot + 0.5 + i * TAU / 5, light, 'rgba(200,240,160,0.4)');
-  c.fillStyle = '#8fd06a'; c.beginPath(); c.arc(X, Y, u * 0.12, 0, TAU); c.fill();
-  c.fillStyle = 'rgba(255,170,80,0.85)'; for (let k = 0; k < 7; k++) { const a = k * 0.9 + seed * 7; c.beginPath(); c.arc(X + Math.cos(a) * u * 0.08, Y + Math.sin(a) * u * 0.08, u * 0.022, 0, TAU); c.fill(); }
-  c.fillStyle = 'rgba(255,255,255,0.35)'; for (let k = 0; k < 5; k++) { const a = k * 1.3 + seed * 3; c.beginPath(); c.arc(X + Math.cos(a) * u * 0.05, Y + Math.sin(a) * u * 0.05, u * 0.012, 0, TAU); c.fill(); }
+  const up = -Math.PI / 2, tilt = (seed - 0.5) * 0.25;
+  c.fillStyle = 'rgba(15,40,10,0.18)'; c.beginPath(); c.ellipse(X + u * 0.05, Y + u * 0.08, u * 0.55, u * 0.3, 0, 0, TAU); c.fill();
+  // Stiel
+  c.strokeStyle = '#2c5a1e'; c.lineWidth = Math.max(1, u * 0.035); c.beginPath(); c.moveTo(X, Y + u * 0.15); c.lineTo(X, Y - u * 0.3); c.stroke();
+  const leaf = (lx, ly, size, ang, col) => { // dunkler Rand → klare Silhouette, dann Blatt, dann helle Rippen
+    c.save(); c.translate(lx, ly);
+    hempLeaf(c, 0, 0, size * 1.06, ang, '#1d4a16', null);
+    hempLeaf(c, 0, 0, size, ang, col, 'rgba(190,240,150,0.55)');
+    c.restore();
+  };
+  leaf(X, Y + u * 0.05, u * 0.42, up + 1.55 + tilt, '#3a8a2c');   // unten rechts
+  leaf(X, Y + u * 0.05, u * 0.42, up - 1.55 + tilt, '#3a8a2c');   // unten links
+  leaf(X, Y - u * 0.05, u * 0.48, up + 0.85 + tilt, '#46a034');   // rechts
+  leaf(X, Y - u * 0.05, u * 0.48, up - 0.85 + tilt, '#46a034');   // links
+  leaf(X, Y - u * 0.1, u * 0.56, up + tilt, '#55b23f');           // großes Hauptblatt oben
+  // Blüte (Cola) mit orangen Härchen
+  c.fillStyle = '#8fd06a'; c.beginPath(); c.ellipse(X, Y - u * 0.12, u * 0.07, u * 0.1, 0, 0, TAU); c.fill();
+  c.fillStyle = 'rgba(255,160,70,0.9)'; for (let k = 0; k < 6; k++) { c.beginPath(); c.arc(X + Math.sin(k * 2.1 + seed * 9) * u * 0.05, Y - u * (0.06 + (k % 3) * 0.05), u * 0.015, 0, TAU); c.fill(); }
 }
 
 const DIM_GROUND = {
