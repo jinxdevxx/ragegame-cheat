@@ -3,9 +3,9 @@
 //  Reihenfolge: Boden → Trümmer-Flecken → Schatten/Objekte/Monster
 //  (nach Tiefe sortiert) → Trümmer → Münzen → Effekte → Overlays
 // =====================================================================
-import { SPRITES, OUT } from './sprites.js?v=0.8.7';
-import { drawMonster } from './monster.js?v=0.8.7';
-import { shadeHex as sh, shadeHex } from './game.js?v=0.8.7';
+import { SPRITES, OUT } from './sprites.js?v=0.8.8';
+import { drawMonster } from './monster.js?v=0.8.8';
+import { shadeHex as sh, shadeHex } from './game.js?v=0.8.8';
 
 const TAU = Math.PI * 2;
 const STARS = Array.from({ length: 220 }, () => ({ x: Math.random(), y: Math.random(), s: Math.random() * 1.8 + 0.4, p: Math.random() * 0.6 + 0.1, tw: Math.random() * 6 }));
@@ -38,7 +38,7 @@ function drawGround(c, g, W, H, sx, sy, z, world, time) {
 // Zellen eines Rasters (Weltmaßstab) im Sichtbereich durchlaufen
 function cells(v, C, cb) {
   const x0 = Math.floor(v.x0 / C), x1 = Math.ceil(v.x1 / C), y0 = Math.floor(v.y0 / C), y1 = Math.ceil(v.y1 / C);
-  if ((x1 - x0) * (y1 - y0) > 6000) return;
+  const F = v.full; if (F ? ((F.x1 - F.x0) / C) * ((F.y1 - F.y0) / C) > 6000 : (x1 - x0) * (y1 - y0) > 6000) return; // Streifen: Dichte-Grenze wie beim ganzen Bild
   for (let ix = x0; ix <= x1; ix++) for (let iy = y0; iy <= y1; iy++) cb(ix, iy);
 }
 // Gelände aus Rauschen: farbige Flecken je Höhenstufe (adaptives Raster, feste Formen)
@@ -47,7 +47,8 @@ function terrain(k, scale, seed, layers) {
   // jede Höhenstufe wird als geschlossene, interpolierte Fläche gefüllt.
   const { c, z, sx, sy, v } = k;
   let C = 16 / z;
-  while (((v.x1 - v.x0) / C) * ((v.y1 - v.y0) / C) > 9000) C *= 1.5;
+  const VF = v.full || v; // Streifen: gleiches Raster wie das ganze Bild (keine Nähte)
+  while (((VF.x1 - VF.x0) / C) * ((VF.y1 - VF.y0) / C) > 9000) C *= 1.5;
   const x0 = Math.floor(v.x0 / C), y0 = Math.floor(v.y0 / C);
   const nx = Math.ceil(v.x1 / C) - x0 + 1, ny = Math.ceil(v.y1 / C) - y0 + 1;
   const PF = typeof window !== 'undefined' && window.__prof, t0 = PF ? performance.now() : 0;
@@ -95,9 +96,24 @@ function terrain(k, scale, seed, layers) {
   if (PF) PF.t_total = (PF.t_total || 0) + performance.now() - t0;
 }
 
-// Teure Landschaften einmal vorzeichnen und wiederverwenden (bis man sich weit bewegt oder stark wächst)
+// Teure Landschaften einmal vorzeichnen und wiederverwenden (bis man sich weit bewegt oder stark wächst).
+// Neuaufbau läuft im Hintergrund in Streifen (wenige ms pro Bild) – solange bleibt das alte Bild stehen.
+// So gibt es beim Wachsen und beim Welt-Wechsel keine 60–150-ms-Hänger mehr.
 const groundCache = {};
-let lastGroundBuild = 0;
+let lastGroundBuild = 0, groundJob = null, lastShown = null, spareCv = null;
+const JOB_STRIPS = 6, JOB_BUDGET = 5; // Streifen pro Neuaufbau, ms Malzeit pro Bild
+if (typeof window !== 'undefined') window.__clearGround = () => { for (const k2 of Object.keys(groundCache)) delete groundCache[k2]; groundJob = null; lastShown = null; };
+function runJob(job, budget) {
+  const t0 = performance.now();
+  do {
+    const { t, kk, painter, oc } = job, i = job.i++;
+    const hy = (t.y1 - t.y0) / JOB_STRIPS, sy0 = t.y0 + hy * i, sy1 = sy0 + hy, m = (t.y1 - t.y0) * 0.12;
+    oc.save(); oc.beginPath(); oc.rect(0, Math.floor((sy0 - t.y0) * kk.z), kk.W, Math.ceil(hy * kk.z) + 1); oc.clip();
+    painter({ ...kk, v: { x0: t.x0, x1: t.x1, y0: sy0 - m, y1: sy1 + m, full: kk.v } });
+    oc.restore();
+  } while (job.i < JOB_STRIPS && performance.now() - t0 < budget);
+  return job.i >= JOB_STRIPS;
+}
 function cached(k, key, painter, fullRes = false) {
   const { c, z, g, W, H, sx, sy } = k;
   const cam = g.cam;
@@ -109,29 +125,43 @@ function cached(k, key, painter, fullRes = false) {
   const now = performance.now();
   // grob gerechnetes Bild nach 1,5 s Ruhe einmal scharf nachrechnen
   const sharpen = t && t.low && now - t.at > 1500 && now - lastGroundBuild > 1500;
-  const stale = !t || sharpen || z / t.z > 1.25 || z / t.z < 0.45 || vx0 < t.x0 || vx1 > t.x1 || vy0 < t.y0 || vy1 > t.y1;
-  if (stale && (!t || sharpen || now - (t.at || 0) > 300 || vx0 < t.x0 - (t.x1 - t.x0) || vy0 < t.y0 - (t.y1 - t.y0))) {
-    for (const k2 of Object.keys(groundCache)) if (k2 !== key) delete groundCache[k2];
+  const outside = t && (vx0 < t.x0 || vx1 > t.x1 || vy0 < t.y0 || vy1 > t.y1);
+  const stale = !t || sharpen || z / t.z > 1.25 || z / t.z < 0.45 || outside;
+  const jobHere = groundJob && groundJob.key === key;
+  if (stale && !jobHere && (!t || sharpen || now - (t.at || 0) > 300 || vx0 < t.x0 - (t.x1 - t.x0) || vy0 < t.y0 - (t.y1 - t.y0))) {
     const fast = !sharpen && now - lastGroundBuild < 2500; // schnelles Wachstum / Weltwechsel: gröber rechnen, dafür flüssig
     const growing = g.p && g.p.r > (t ? t.r || 0 : 0) * 1.01;
     // beim Wachsen großzügig im Voraus rechnen (deckt ~1,6× weiteres Rauszoomen ab)
     const span = growing ? 0.8 : 0.45, mx = W / z * span, my = H / z * span;
-    const RES = fullRes ? (fast ? 0.7 : 1) : fast ? 0.45 : 0.7; // fullRes: billiger Maler → 1:1, dann muss pro Bild nichts skaliert werden
-    t = t || { cv: document.createElement('canvas') };
-    t.at = now; t.low = fast; lastGroundBuild = now; t.z = z; t.r = g.p ? g.p.r : 0; t.x0 = vx0 - mx; t.x1 = vx1 + mx; t.y0 = vy0 - my; t.y1 = vy1 + my;
-    const zz = z * RES * (fullRes ? Math.min(2, c.getTransform().a || 1) : 1); // fullRes: in Geräte-Pixeln (Retina scharf)
-    t.cv.width = Math.ceil((t.x1 - t.x0) * zz); t.cv.height = Math.ceil((t.y1 - t.y0) * zz);
-    const oc = t.cv.getContext('2d');
-    oc.clearRect(0, 0, t.cv.width, t.cv.height); // transparent: liegt über dem Boden
-    painter({ ...k, c: oc, z: zz, W: t.cv.width, H: t.cv.height, sx: x => (x - t.x0) * zz, sy: y => (y - t.y0) * zz,
-      v: { x0: t.x0, x1: t.x1, y0: t.y0, y1: t.y1 } });
-    groundCache[key] = t;
+    const RES = fullRes ? (fast ? 0.7 : 1) : fast ? 0.45 : 0.7;
+    const nt = { cv: spareCv || document.createElement('canvas') }; spareCv = null;
+    nt.at = now; nt.low = fast; lastGroundBuild = now; nt.z = z; nt.r = g.p ? g.p.r : 0;
+    nt.x0 = vx0 - mx; nt.x1 = vx1 + mx; nt.y0 = vy0 - my; nt.y1 = vy1 + my;
+    const zz = z * RES * (fullRes ? Math.min(2, c.getTransform().a || 1) : 1);
+    nt.cv.width = Math.ceil((nt.x1 - nt.x0) * zz); nt.cv.height = Math.ceil((nt.y1 - nt.y0) * zz);
+    const oc = nt.cv.getContext('2d');
+    oc.clearRect(0, 0, nt.cv.width, nt.cv.height); // transparent: liegt über dem Boden
+    const kk = { ...k, c: oc, z: zz, W: nt.cv.width, H: nt.cv.height, sx: x => (x - nt.x0) * zz, sy: y => (y - nt.y0) * zz,
+      v: { x0: nt.x0, x1: nt.x1, y0: nt.y0, y1: nt.y1 } };
+    groundJob = { key, t: nt, kk, painter, oc, i: 0 };
+    // Ohne brauchbares altes Bild (erster Aufbau, Sprung) sofort fertig malen
+    const old = t || lastShown;
+    const covers = old && !(vx1 < old.x0 || vx0 > old.x1 || vy1 < old.y0 || vy0 > old.y1) && z / old.z < 3 && z / old.z > 0.15;
+    const W8 = typeof window !== 'undefined' ? window : {};
+    if ((!covers && !W8.__groundStrips) || W8.__groundSync) runJob(groundJob, Infinity);
   }
+  if (groundJob && groundJob.key === key && (groundJob.i >= JOB_STRIPS || runJob(groundJob, JOB_BUDGET))) {
+    for (const k2 of Object.keys(groundCache)) { if (groundCache[k2].cv !== groundJob.t.cv) spareCv = groundCache[k2].cv; delete groundCache[k2]; }
+    t = groundCache[key] = groundJob.t; groundJob = null;
+  }
+  const show = t || lastShown;
+  if (!show) return;
+  lastShown = show;
   c.imageSmoothingEnabled = true;
-  const tf = c.getTransform(), dw = (t.x1 - t.x0) * z * tf.a;
-  if (Math.abs(dw - t.cv.width) < 1) { // 1:1 → pixelgenau kopieren (keine Filterung, sehr billig)
-    c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(t.cv, Math.round(sx(t.x0) * tf.a + tf.e), Math.round(sy(t.y0) * tf.d + tf.f)); c.restore();
-  } else c.drawImage(t.cv, sx(t.x0), sy(t.y0), (t.x1 - t.x0) * z, (t.y1 - t.y0) * z);
+  const tf = c.getTransform(), dw = (show.x1 - show.x0) * z * tf.a;
+  if (Math.abs(dw - show.cv.width) < 1) { // 1:1 → pixelgenau kopieren (keine Filterung, sehr billig)
+    c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(show.cv, Math.round(sx(show.x0) * tf.a + tf.e), Math.round(sy(show.y0) * tf.d + tf.f)); c.restore();
+  } else c.drawImage(show.cv, sx(show.x0), sy(show.y0), (show.x1 - show.x0) * z, (show.y1 - show.y0) * z);
 }
 const circle = (c, x, y, r, col) => { c.fillStyle = col; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); };
 // Baum von oben (Krone mit Schatten)

@@ -6,6 +6,17 @@
 
 export const PATCH_NOTES = [
   {
+    version: '0.8.8',
+    date: '2026-11-26',
+    title: 'Flüssig durch alle Welten',
+    summary: 'Die kurzen Hänger beim Wachsen und beim Welt-Wechsel sind weg – auf allen Karten.',
+    changes: [
+      'Größter Ruckler gefunden: das große „WELT X“-Banner. Sein weicher Riesenschatten musste beim Reinzoomen in jedem Bild neu berechnet werden – 70–180 ms Hänger bei fast jedem Welt-Wechsel. Jetzt eigene Grafik-Ebene und harter Schatten: gleicher Look, kein Hänger mehr (auch bei den Kombo-Rufen).',
+      'Der Boden wird beim Wachsen nicht mehr auf einen Schlag neu gemalt, sondern im Hintergrund in Streifen (ein paar Millisekunden pro Bild) – solange bleibt das alte Bild stehen. Pixelgenau gleiches Ergebnis.',
+      'Gemessen (alles ausgemaxt, Hauptkarte): ruckelnde Bilder von 3–6 % auf unter 1 %, schlimmster Hänger von bis zu 180 ms auf ~50–70 ms, Ø 57 statt 51 FPS.',
+    ],
+  },
+  {
     version: '0.8.7',
     date: '2026-11-26',
     title: '420 ohne Ruckeln',
