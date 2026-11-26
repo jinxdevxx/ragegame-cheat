@@ -3,9 +3,9 @@
 //  Reihenfolge: Boden → Trümmer-Flecken → Schatten/Objekte/Monster
 //  (nach Tiefe sortiert) → Trümmer → Münzen → Effekte → Overlays
 // =====================================================================
-import { SPRITES, OUT } from './sprites.js?v=0.8.6';
-import { drawMonster } from './monster.js?v=0.8.6';
-import { shadeHex as sh, shadeHex } from './game.js?v=0.8.6';
+import { SPRITES, OUT } from './sprites.js?v=0.8.7';
+import { drawMonster } from './monster.js?v=0.8.7';
+import { shadeHex as sh, shadeHex } from './game.js?v=0.8.7';
 
 const TAU = Math.PI * 2;
 const STARS = Array.from({ length: 220 }, () => ({ x: Math.random(), y: Math.random(), s: Math.random() * 1.8 + 0.4, p: Math.random() * 0.6 + 0.1, tw: Math.random() * 6 }));
@@ -98,7 +98,7 @@ function terrain(k, scale, seed, layers) {
 // Teure Landschaften einmal vorzeichnen und wiederverwenden (bis man sich weit bewegt oder stark wächst)
 const groundCache = {};
 let lastGroundBuild = 0;
-function cached(k, key, painter) {
+function cached(k, key, painter, fullRes = false) {
   const { c, z, g, W, H, sx, sy } = k;
   const cam = g.cam;
   key = key + ':' + (g.map ? g.map.id : '') + ':' + g.world;
@@ -116,10 +116,10 @@ function cached(k, key, painter) {
     const growing = g.p && g.p.r > (t ? t.r || 0 : 0) * 1.01;
     // beim Wachsen großzügig im Voraus rechnen (deckt ~1,6× weiteres Rauszoomen ab)
     const span = growing ? 0.8 : 0.45, mx = W / z * span, my = H / z * span;
-    const RES = fast ? 0.45 : 0.7;
+    const RES = fullRes ? (fast ? 0.7 : 1) : fast ? 0.45 : 0.7; // fullRes: billiger Maler → 1:1, dann muss pro Bild nichts skaliert werden
     t = t || { cv: document.createElement('canvas') };
     t.at = now; t.low = fast; lastGroundBuild = now; t.z = z; t.r = g.p ? g.p.r : 0; t.x0 = vx0 - mx; t.x1 = vx1 + mx; t.y0 = vy0 - my; t.y1 = vy1 + my;
-    const zz = z * RES;
+    const zz = z * RES * (fullRes ? Math.min(2, c.getTransform().a || 1) : 1); // fullRes: in Geräte-Pixeln (Retina scharf)
     t.cv.width = Math.ceil((t.x1 - t.x0) * zz); t.cv.height = Math.ceil((t.y1 - t.y0) * zz);
     const oc = t.cv.getContext('2d');
     oc.clearRect(0, 0, t.cv.width, t.cv.height); // transparent: liegt über dem Boden
@@ -128,7 +128,10 @@ function cached(k, key, painter) {
     groundCache[key] = t;
   }
   c.imageSmoothingEnabled = true;
-  c.drawImage(t.cv, sx(t.x0), sy(t.y0), (t.x1 - t.x0) * z, (t.y1 - t.y0) * z);
+  const tf = c.getTransform(), dw = (t.x1 - t.x0) * z * tf.a;
+  if (Math.abs(dw - t.cv.width) < 1) { // 1:1 → pixelgenau kopieren (keine Filterung, sehr billig)
+    c.save(); c.setTransform(1, 0, 0, 1, 0, 0); c.drawImage(t.cv, Math.round(sx(t.x0) * tf.a + tf.e), Math.round(sy(t.y0) * tf.d + tf.f)); c.restore();
+  } else c.drawImage(t.cv, sx(t.x0), sy(t.y0), (t.x1 - t.x0) * z, (t.y1 - t.y0) * z);
 }
 const circle = (c, x, y, r, col) => { c.fillStyle = col; c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill(); };
 // Baum von oben (Krone mit Schatten)
@@ -219,6 +222,8 @@ function wavyLine(c, X, Y, w, amp, n) { c.beginPath(); for (let i = 0; i <= n; i
 // ein paar Rauchwolken-Bilder und Glühwürmchen. Keine Neuaufbau-Spitzen.
 // =====================================================================
 let tile420 = null, smoke420 = null;
+// Kachel vorab im Menü bauen (sonst ~100 ms Ruckler beim ersten Bild auf Karte 420)
+export function prewarm420() { if (!tile420) { tile420 = make420Tile(); smoke420 = makeSmoke(); } }
 function make420Tile() {
   const N = 1024, cv = document.createElement('canvas'); cv.width = cv.height = N; const c = cv.getContext('2d');
   let sd = 4207; const rnd = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
@@ -241,6 +246,7 @@ function make420Tile() {
     const X = x + (rnd() - 0.5) * 14, Y = y0 + 186 + (rnd() - 0.5) * 8, u = 128 + rnd() * 18, sdd = rnd();
     wrap(() => hempPlant(c, X, Y + u * 0.15, u * 1.15, sdd));
   }
+  c.fillStyle = 'rgba(255,190,90,0.07)'; c.fillRect(0, 0, N, N); // warmes Abendlicht direkt eingebacken (kein Vollbild-Verlauf pro Bild)
   return cv;
 }
 function makeSmoke() {
@@ -249,30 +255,31 @@ function makeSmoke() {
   return cv;
 }
 function draw420(k) {
-  const { c, z, W, H, g, time } = k;
+  const { c, W, H, g, time } = k;
   if (!tile420) { tile420 = make420Tile(); smoke420 = makeSmoke(); }
   const r = Math.max(10, g.p ? g.p.r : 10), lg = Math.log(r) / Math.log(4), step = Math.floor(lg), frac = lg - step;
-  const ox = k.sx(0), oy = k.sy(0);
   c.fillStyle = '#3d8a2c'; c.fillRect(0, 0, W, H);
-  // zwei Größenstufen (Kachel = 26 Weltradien der jeweiligen Stufe), weich überblendet
-  const bl = Math.max(0, (frac - 0.8) / 0.2), mix = bl * bl * (3 - 2 * bl); // nur kurz vor dem Größensprung überblenden
-  for (const [st, a] of [[step, 1 - mix], [step + 1, mix]]) {
-    if (a < 0.02) continue;
-    const S = Math.pow(4, st) * 0.8, tw = S * 40 * z, pat = c.createPattern(tile420, 'repeat');
-    pat.setTransform(new DOMMatrix([tw / 1024, 0, 0, tw / 1024, ox % tw, oy % tw]));
-    c.globalAlpha = a; c.fillStyle = pat; c.fillRect(0, 0, W, H);
-  }
+  // Performance: das skalierte Kachelmuster wird NICHT mehr in jedem Bild über den ganzen Bildschirm gefiltert
+  // (auf Retina ~60 ms/Bild), sondern wie bei allen anderen Karten nur beim Neuaufbau in den Boden-Zwischenspeicher gemalt.
+  const bl = Math.max(0, (frac - 0.8) / 0.2), mix = bl * bl * (3 - 2 * bl);
+  cached(k, 'w420:' + step + ':' + (mix > 0.5 ? 1 : 0), kk => {
+    const oc = kk.c, ox = kk.sx(0), oy = kk.sy(0);
+    oc.fillStyle = '#3d8a2c'; oc.fillRect(0, 0, kk.W, kk.H);
+    for (const [st, a] of [[step, 1 - mix], [step + 1, mix]]) {
+      if (a < 0.02) continue;
+      const S = Math.pow(4, st) * 0.8, tw = S * 40 * kk.z, pat = oc.createPattern(tile420, 'repeat');
+      pat.setTransform(new DOMMatrix([tw / 1024, 0, 0, tw / 1024, ox % tw, oy % tw]));
+      oc.globalAlpha = a; oc.fillStyle = pat; oc.fillRect(0, 0, kk.W, kk.H);
+    }
+    oc.globalAlpha = 1;
+  });
+  // Rauchwolken (fertige Bilder) ziehen langsam vorbei – 3 statt 6, kleiner
+  for (let i = 0; i < 3; i++) { const t = time * 0.025 + i * 0.37, x = ((t + i * 0.27) % 1.3 - 0.15) * W, y = (0.2 + ((i * 0.31) % 0.7)) * H + Math.sin(time * 0.3 + i) * 20, sz = Math.min(W, H) * (0.4 + (i % 2) * 0.15);
+    c.globalAlpha = 0.16; c.drawImage(smoke420, x - sz / 2, y - sz / 2, sz, sz); }
   c.globalAlpha = 1;
-  // Abendlicht: warmer Schimmer oben, Vignette am Rand
-  const gl = c.createLinearGradient(0, 0, 0, H); gl.addColorStop(0, 'rgba(255,190,90,0.18)'); gl.addColorStop(0.45, 'rgba(255,190,90,0)'); gl.addColorStop(1, 'rgba(40,10,60,0.12)');
-  c.fillStyle = gl; c.fillRect(0, 0, W, H);
-  // Rauchwolken (fertige Bilder) ziehen langsam vorbei
-  for (let i = 0; i < 6; i++) { const t = time * 0.025 + i * 0.37, x = ((t + i * 0.13) % 1.3 - 0.15) * W, y = (0.15 + ((i * 0.29) % 0.8)) * H + Math.sin(time * 0.3 + i) * 20, sz = Math.min(W, H) * (0.45 + (i % 3) * 0.15);
-    c.globalAlpha = 0.14; c.drawImage(smoke420, x - sz / 2, y - sz / 2, sz, sz); }
-  c.globalAlpha = 1;
-  // Glühwürmchen
-  for (let i = 0; i < 26; i++) { const ph = time * 0.4 + i * 1.7, x = ((Math.sin(i * 12.9) * 0.5 + 0.5) * W + Math.sin(ph) * 40) % W, y = ((Math.cos(i * 7.3) * 0.5 + 0.5) * H + Math.cos(ph * 0.8) * 30) % H, a = 0.4 + 0.6 * Math.max(0, Math.sin(time * 2 + i));
-    c.fillStyle = `rgba(255,240,140,${a * 0.25})`; c.beginPath(); c.arc(x, y, 7, 0, TAU); c.fill(); c.fillStyle = `rgba(255,250,200,${a})`; c.beginPath(); c.arc(x, y, 2, 0, TAU); c.fill(); }
+  // Glühwürmchen (klein, billig)
+  for (let i = 0; i < 18; i++) { const ph = time * 0.4 + i * 1.7, x = ((Math.sin(i * 12.9) * 0.5 + 0.5) * W + Math.sin(ph) * 40) % W, y = ((Math.cos(i * 7.3) * 0.5 + 0.5) * H + Math.cos(ph * 0.8) * 30) % H, a = 0.4 + 0.6 * Math.max(0, Math.sin(time * 2 + i));
+    c.fillStyle = `rgba(255,240,140,${a * 0.25})`; c.beginPath(); c.arc(x, y, 6, 0, TAU); c.fill(); c.fillStyle = `rgba(255,250,200,${a})`; c.beginPath(); c.arc(x, y, 2, 0, TAU); c.fill(); }
 }
 
 // Hanfblatt für die Boden-Deko (ohne Umriss): 7 schmale, spitze, gezackte Fiederblätter mit heller Mittelrippe

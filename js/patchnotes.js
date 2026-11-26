@@ -6,6 +6,18 @@
 
 export const PATCH_NOTES = [
   {
+    version: '0.8.7',
+    date: '2026-11-26',
+    title: '420 ohne Ruckeln',
+    summary: 'Die Easter-Egg-Karte läuft jetzt auch auf Retina-/hochauflösenden Bildschirmen flüssig – gleich gut wie die normalen Karten.',
+    changes: [
+      'Ursache gefunden: Auf hochauflösenden Bildschirmen (z. B. MacBook) wurde der Hanf-Boden in jedem Bild Pixel für Pixel neu aus dem Muster berechnet – ~80 ms pro Bild, fast 4× so teuer wie auf jeder anderen Karte.',
+      'Der Boden wird jetzt wie überall vorgemalt und nur noch verschoben: 92 → 25 ms Grafik-Arbeit pro Bild (gemessen in hoher Auflösung), die Bildrate bleibt dabei in höherer Auflösung stabil.',
+      'Weniger Vollbild-Ebenen: Abendlicht direkt in den Boden eingebacken, 3 statt 6 Rauchwolken, weniger Glühwürmchen.',
+      'Der Boden der Karte wird schon im Hauptmenü vorbereitet – kein Ruckler mehr beim Start.',
+    ],
+  },
+  {
     version: '0.8.6',
     date: '2026-11-26',
     title: 'Echter Bosskampf',
