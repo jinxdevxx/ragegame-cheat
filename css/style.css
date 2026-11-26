@@ -482,3 +482,6 @@ body.touch .ab-key { display: none; }
   .slot-grid canvas { height: 70px; }
 }
 #btn-automut.on { border-color: #4ade80; color: #bbf7d0; box-shadow: 0 4px 0 #14532d; }
+
+#btn-bossrush, #btn-res-boss { background: linear-gradient(180deg, #5a0d0d, #2a0505); border-color: #ff3b2f; color: #ffd0c0; }
+#btn-bossrush:hover, #btn-res-boss:hover { border-color: #ffb13d; }

@@ -523,6 +523,8 @@ export const BOSS = {
   rewardChaos: 250000,
   rewardDM: 250,           // ◆ Dunkle Materie
   unlock: 'infernus',
+  // Abkürzung „Direkt zu ZORNOS“ (frei, sobald Welt 50 einmal erreicht wurde): Start in Welt 50 mit 49 zufälligen Mutationen
+  rush: { dmMult: 0.4 }, // ◆-Belohnung bei Sieg über die Abkürzung (Schrott-Belohnung voll); zählt nicht für den Urknall-Bonus
 };
 
 export const SPAWN = {

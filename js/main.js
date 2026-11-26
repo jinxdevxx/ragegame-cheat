@@ -1,12 +1,12 @@
 // =====================================================================
 //  RAGEVERSE – Einstieg: Game-Loop, Steuerung, Menüs, Shop, Updates
 // =====================================================================
-import * as C from './config.js?v=0.8.8';
-import { monsterData, talentRank, talentFree, canRaiseTalent, raiseTalent, Game, computeStats, upgradeLevel, upgradeCost, fmt, money, tierOf, charDef, mapDef, dmLevel, dmCost, prestigeGain, doPrestige } from './game.js?v=0.8.8';
-import { render, drawMonsterPreview, prewarm420 } from './render.js?v=0.8.8';
-import { initAudio, setMuted, setMusic, setIntensity, setVolumes, sfx } from './audio.js?v=0.8.8';
-import { loadSave, writeSave, listSlots, loadSlotInto, createSlot, deleteSlot, getSlot, loadMeta } from './save.js?v=0.8.8';
-import { PATCH_NOTES, VERSION } from './patchnotes.js?v=0.8.8';
+import * as C from './config.js?v=0.8.9';
+import { monsterData, talentRank, talentFree, canRaiseTalent, raiseTalent, Game, computeStats, upgradeLevel, upgradeCost, fmt, money, tierOf, charDef, mapDef, dmLevel, dmCost, prestigeGain, doPrestige } from './game.js?v=0.8.9';
+import { render, drawMonsterPreview, prewarm420 } from './render.js?v=0.8.9';
+import { initAudio, setMuted, setMusic, setIntensity, setVolumes, sfx } from './audio.js?v=0.8.9';
+import { loadSave, writeSave, listSlots, loadSlotInto, createSlot, deleteSlot, getSlot, loadMeta } from './save.js?v=0.8.9';
+import { PATCH_NOTES, VERSION } from './patchnotes.js?v=0.8.9';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -210,10 +210,14 @@ function show(id) {
   if (!inRun || id) flushPendingToast();
 }
 
-function startRun() {
+let lastRunExtra = {};
+function startRun(e, extra = {}) {
   initAudio(); sfx('click');
+  // „Nochmal“ wiederholt den letzten Modus (z. B. die Boss-Abkürzung)
+  if (e && e.currentTarget && e.currentTarget.dataset && 'play' in e.currentTarget.dataset) extra = bossRushOpen() ? lastRunExtra : {};
+  lastRunExtra = extra;
   inRun = true;
-  const opts = {};
+  const opts = { ...extra };
   if (params.has('world')) { const w = C.WORLDS[Number(params.get('world'))]; if (w) opts.radius = Math.max(w.minRadius * 1.15, 10); }
   game.start(opts);
   lastCombo = 0; hudCache = {};
@@ -235,6 +239,8 @@ function back() { sfx('click'); if (current === 'screen-help' && helpFrom === 's
 document.querySelectorAll('[data-play]').forEach(b => b.onclick = startRun);
 document.querySelectorAll('[data-back]').forEach(b => b.onclick = back);
 $('btn-play').onclick = startRun;
+$('btn-bossrush').onclick = $('btn-res-boss').onclick = () => { if (bossRushOpen()) startRun(null, { bossRush: true }); };
+function bossRushOpen() { const mp = mapDef(save.selectedMap); return !mp.goal && mp.worlds.length - 1 === C.BOSS.world && (bestWorldAny() >= C.BOSS.world || save.bossKills > 0); }
 $('btn-shop-menu').onclick = () => openShop();
 $('btn-res-shop').onclick = () => openShop();
 $('btn-res-menu').onclick = () => openMenu();
@@ -504,6 +510,7 @@ function openMenu() {
   $('menu-dm').textContent = fmt(save.darkMatter || 0);
   $('menu-ach').textContent = `${C.ACHIEVEMENTS.filter(a => save.achievements[a.id]).length}/${C.ACHIEVEMENTS.length}`;
   $('menu-dm-pill').hidden = !(save.darkMatter || save.prestiges);
+  $('btn-bossrush').hidden = !bossRushOpen();
   const w = C.WORLDS[bestWorldAny()] || C.WORLDS[0];
   $('menu-stats').innerHTML = save.runs ? `
     <div class="stat"><b>${w.name}</b><small>Weiteste Welt</small></div>
@@ -887,6 +894,7 @@ function lvlBlock(s) {
 }
 function showResults(s) {
   writeSave(save);
+  $('btn-res-boss').hidden = !bossRushOpen(); // Welt 50 schon gesehen → direkt nochmal gegen ZORNOS
   $('res-title').textContent = s.won420 ? '🌿 420 GESCHAFFT!' : s.bossKilled ? '😈 ZORNOS BESIEGT!' : 'Wut verraucht!';
   setIntensity(0);
   const mins = Math.floor(s.time / 60), secs = Math.floor(s.time % 60);

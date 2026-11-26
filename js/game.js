@@ -1,7 +1,7 @@
 // =====================================================================
 //  RAGEVERSE – Spiel-Logik (Simulation, keine Grafik)
 // =====================================================================
-import * as C from './config.js?v=0.8.8';
+import * as C from './config.js?v=0.8.9';
 
 const TAU = Math.PI * 2;
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -153,7 +153,9 @@ export class Game {
     this.char = charDef(opts.char || this.save.selectedChar);
     this.muts = [];
     this.stats = computeStats(this.save, this.muts, this.char.id);
-    const r = opts.radius || this.stats.startRadius;
+    // Boss-Abkürzung: wer Welt 50 schon erreicht hat, darf direkt zu ZORNOS (siehe C.BOSS.rush)
+    this.bossRush = !!opts.bossRush && this.worlds.length - 1 === C.BOSS.world;
+    const r = this.bossRush ? this.worlds[C.BOSS.world].minRadius * 1.02 : opts.radius || this.stats.startRadius;
     this.p = {
       x: 0, y: 0, vx: 0, vy: 0, r, mass: r * r, rage: this.stats.rageMax,
       dashT: 0, dashCd: 0, dashX: 1, dashY: 0, lookX: 1, lookY: 0, face: 1, walk: 0,
@@ -179,6 +181,8 @@ export class Game {
     this.cam.x = 0; this.cam.y = 0; this.cam.zoom = this.targetZoom();
     // Genlabor: mit zufälligen Mutationen starten
     for (let i = 0; i < this.stats.startMuts; i++) { const ch = this.mutationChoices(); if (ch.length) this.muts.push(ch[0].id); }
+    // Abkürzung: so viele zufällige Mutationen, wie man auf dem Weg durch 49 Welten bekommen hätte
+    if (this.bossRush) for (let i = 0; i < C.BOSS.world; i++) { const ch = this.mutationChoices(); if (ch.length) this.muts.push(ch[Math.floor(Math.random() * ch.length)].id); }
     if (this.muts.length) this.stats = computeStats(this.save, this.muts, this.char.id);
     this.spawnTick(true);
     this.state = 'play';
@@ -1305,22 +1309,23 @@ export class Game {
     }
     if (this.bossKilled) {
       s.bossKills = (s.bossKills || 0) + 1;
-      s.darkMatter = (s.darkMatter || 0) + C.BOSS.rewardDM; s.totalDarkMatter = (s.totalDarkMatter || 0) + C.BOSS.rewardDM;
+      const dm = Math.round(C.BOSS.rewardDM * (this.bossRush ? C.BOSS.rush.dmMult : 1)); // Abkürzung: weniger ◆, sonst wäre Boss-Farmen zu stark
+      s.darkMatter = (s.darkMatter || 0) + dm; s.totalDarkMatter = (s.totalDarkMatter || 0) + dm;
       if (!s.unlockedChars.includes(C.BOSS.unlock)) s.unlockedChars.push(C.BOSS.unlock);
     }
-    s.cycleBest = Math.max(s.cycleBest || 0, this.world);
+    if (!this.bossRush) s.cycleBest = Math.max(s.cycleBest || 0, this.world); // Abkürzung zählt nicht für den Urknall-Bonus
     s.mapBest = s.mapBest || {};
     s.mapBest[this.map.id] = Math.max(s.mapBest[this.map.id] || 0, this.world);
     s.bestWorld = Math.max(s.bestWorld || 0, this.world);
     s.bestRadius = Math.max(s.bestRadius || 0, this.maxRadius);
     // Monster-EP
     const md = monsterData(s, this.char.id), lvlBefore = md.lvl;
-    const xp = md.lvl >= C.MONSTER_LEVEL.max ? 0 : runXp(this.kills, this.world, this.questsDone);
+    const xp = md.lvl >= C.MONSTER_LEVEL.max ? 0 : runXp(this.kills, this.bossRush ? 0 : this.world, this.questsDone);
     const lvlUps = addMonsterXp(s, this.char.id, xp);
     this.hook('onEnd', {
       xp, lvlBefore, lvlAfter: md.lvl, lvlUps, charId: this.char.id,
       earned, chaos, kills: this.kills, map: this.map.id, time: this.time, world: this.world, maxRadius: this.maxRadius,
-      bestCombo: this.bestCombo, muts: this.muts.slice(), quests: this.questsDone, bossKilled: !!this.bossKilled, won420: !!this.won420, leaves: this.leaves || 0, ...rec,
+      bestCombo: this.bestCombo, muts: this.muts.slice(), quests: this.questsDone, bossKilled: !!this.bossKilled, bossRush: this.bossRush, won420: !!this.won420, leaves: this.leaves || 0, ...rec,
     });
   }
 

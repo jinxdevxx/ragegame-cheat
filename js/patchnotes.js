@@ -6,6 +6,18 @@
 
 export const PATCH_NOTES = [
   {
+    version: '0.8.9',
+    date: '2026-11-26',
+    title: 'Direkt zu ZORNOS',
+    summary: 'Wer Welt 50 einmal erreicht hat, kann ZORNOS jetzt direkt nochmal herausfordern – ohne erst durch alle Welten zu rushen.',
+    changes: [
+      'Neuer Knopf 😈 Direkt zu ZORNOS im Hauptmenü und auf dem Ergebnis-Bildschirm – frei, sobald du einmal in Welt 50 warst (auch wenn du verloren hast).',
+      'Du startest direkt in Welt 50 mit 49 zufälligen Mutationen, wie du sie auf dem Weg bekommen hättest – der Kampf ist so schwer wie nach einem normalen Run (mit Bot gemessen).',
+      '„Nochmal!“ nach einem Boss-Versuch geht wieder direkt zum Boss.',
+      'Fair bleibt fair: Ein Sieg über die Abkürzung gibt 100 statt 250 ◆, zählt nicht für den Urknall-Bonus und gibt weniger Monster-EP. Schrott-Belohnung und Freischaltungen gibt es voll.',
+    ],
+  },
+  {
     version: '0.8.8',
     date: '2026-11-26',
     title: 'Flüssig durch alle Welten',
