@@ -3,9 +3,9 @@
 //  Reihenfolge: Boden → Trümmer-Flecken → Schatten/Objekte/Monster
 //  (nach Tiefe sortiert) → Trümmer → Münzen → Effekte → Overlays
 // =====================================================================
-import { SPRITES, OUT } from './sprites.js?v=0.8.5';
-import { drawMonster } from './monster.js?v=0.8.5';
-import { shadeHex as sh, shadeHex } from './game.js?v=0.8.5';
+import { SPRITES, OUT } from './sprites.js?v=0.8.6';
+import { drawMonster } from './monster.js?v=0.8.6';
+import { shadeHex as sh, shadeHex } from './game.js?v=0.8.6';
 
 const TAU = Math.PI * 2;
 const STARS = Array.from({ length: 220 }, () => ({ x: Math.random(), y: Math.random(), s: Math.random() * 1.8 + 0.4, p: Math.random() * 0.6 + 0.1, tw: Math.random() * 6 }));
@@ -1309,6 +1309,19 @@ function drawOverlays(c, g, W, H, time) {
     const v = c.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.3, W / 2, H / 2, Math.max(W, H) * 0.75);
     v.addColorStop(0, 'rgba(120,0,0,0)'); v.addColorStop(1, `rgba(170,0,0,${danger})`);
     c.fillStyle = v; c.fillRect(0, 0, W, H);
+  }
+  // ZORNOS außerhalb des Bildes: roter Pfeil am Rand zeigt, wo er ist
+  if (g.boss) {
+    const z = g.cam.zoom, bx = (g.boss.x - g.cam.x) * z + W / 2, by = (g.boss.y - g.cam.y) * z + H / 2, m = 46, rr = g.boss.size * z;
+    if (bx < -rr || bx > W + rr || by < -rr || by > H + rr) {
+      const a = Math.atan2(by - H / 2, bx - W / 2), k = Math.min((W / 2 - m) / Math.abs(Math.cos(a) || 1e-6), (H / 2 - m) / Math.abs(Math.sin(a) || 1e-6));
+      const ax = W / 2 + Math.cos(a) * k, ay = H / 2 + Math.sin(a) * k, pul = 1 + Math.sin(time * 8) * 0.12;
+      c.save(); c.translate(ax, ay); c.rotate(a); c.scale(pul, pul);
+      c.fillStyle = '#ff3b2f'; c.strokeStyle = '#fff'; c.lineWidth = 3;
+      c.beginPath(); c.moveTo(20, 0); c.lineTo(-12, -15); c.lineTo(-5, 0); c.lineTo(-12, 15); c.closePath(); c.fill(); c.stroke();
+      c.restore();
+      c.font = '22px "Lilita One", sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('😈', ax - Math.cos(a) * 34, ay - Math.sin(a) * 34);
+    }
   }
   if (g.freezeT > 0) { c.fillStyle = `rgba(150,220,255,${Math.min(0.28, g.freezeT * 0.1)})`; c.fillRect(0, 0, W, H); }
   if (p.roarT > 0) { c.strokeStyle = `rgba(255,210,63,${0.3 + Math.sin(time * 10) * 0.1})`; c.lineWidth = 10; c.strokeRect(5, 5, W - 10, H - 10); }

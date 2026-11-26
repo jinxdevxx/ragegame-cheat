@@ -6,6 +6,20 @@
 
 export const PATCH_NOTES = [
   {
+    version: '0.8.6',
+    date: '2026-11-26',
+    title: 'Echter Bosskampf',
+    summary: 'ZORNOS komplett neu abgestimmt: kein 0-Schaden mehr, kein Sekunden-Sieg – ein reiner Bosskampf mit Ausweichen und Hit & Run.',
+    changes: [
+      'Fehler behoben: In Welt 50 wurde ZORNOS mit jedem Wachsen härter – wer drumherum Objekte gefressen hat, machte irgendwann 0 Schaden. Seine Härte steht jetzt beim Erscheinen fest.',
+      'Reine Arena: Sobald ZORNOS erscheint, verpufft alles andere und es spawnt nichts mehr nach – nur du, er und seine Diener. Danach geht es normal weiter.',
+      'Schaden neu: Upgrades machen den Kampf schneller, aber nicht mehr zur Sekundensache. Knapp angekommen ~60 s, komplett ausgebaut ~30 s (gemessen mit Bot).',
+      'Hit & Run: Am Boss kleben verbrennt dich (−7 % Wut). Mit ⚡ Ansturm reinkrachen macht den großen Schaden, du prallst ab – dann ausweichen und wieder rein.',
+      'ZORNOS greift öfter an und trifft härter (Feuerring, Meteore, Sturmangriff, Feuerbälle). Rüstung schützt gegen ihn nur noch abgeschwächt, Berserker halbiert den Schaden statt unverwundbar zu machen.',
+      'Roter Pfeil am Bildschirmrand zeigt, wo ZORNOS ist.',
+    ],
+  },
+  {
     version: '0.8.5',
     date: '2026-11-26',
     title: 'Mutation auf Autopilot',

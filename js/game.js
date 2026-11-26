@@ -1,7 +1,7 @@
 // =====================================================================
 //  RAGEVERSE – Spiel-Logik (Simulation, keine Grafik)
 // =====================================================================
-import * as C from './config.js?v=0.8.5';
+import * as C from './config.js?v=0.8.6';
 
 const TAU = Math.PI * 2;
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -266,7 +266,7 @@ export class Game {
       p.fireTick = (p.fireTick || 0) - dt;
       if (p.fireTick <= 0) {
         p.fireTick = 0.2; const R = p.r * 3.8, lim = this.breakLimit() * 1.5, hit = this.oneHit();
-        for (const o of this.objects) { if (o.dead || o.size > lim) continue; if (Math.hypot(o.x - p.x, o.y - p.y) > R + o.size * 0.5) continue; o.hp -= hit * 3; o.flash = 1; if (o.hp <= 0) { this.kill(o, 'boom'); p.rage = Math.min(S.rageMax, p.rage + S.rageMax * 0.02); } }
+        for (const o of this.objects) { if (o.dead || o.size > lim) continue; if (Math.hypot(o.x - p.x, o.y - p.y) > R + o.size * 0.5) continue; o.hp -= hit * 3; o.flash = 1; if (o.hp <= 0) { this.kill(o, 'boom'); if (!this.boss) p.rage = Math.min(S.rageMax, p.rage + S.rageMax * 0.02); } }
         if (this.boss && Math.hypot(this.boss.x - p.x, this.boss.y - p.y) < R + this.boss.size) this.bossHurt(0.3 * S.damage / this.bossDamageNeed());
       }
       for (let i = 0; i < 2; i++) { const a = Math.random() * TAU; this.particle(p.x + Math.cos(a) * p.r * 3.8, p.y + Math.sin(a) * p.r * 3.8 * 0.6, Math.random() < 0.5 ? '#ff6a1f' : '#ffd23f', p.r * 0.35, 0.5, 0, -p.r * 2, 'flame'); }
@@ -359,7 +359,7 @@ export class Game {
 
     // --- Spawning
     this.spawnT -= dt;
-    if (this.spawnT <= 0) { this.spawnT = 0.2; this.spawnTick(false); }
+    if (this.spawnT <= 0 && !this.boss) { this.spawnT = 0.2; this.spawnTick(false); } // Boss: reine Arena
 
     this.updateFx(dt);
   }
@@ -658,6 +658,10 @@ export class Game {
     const a = Math.random() * TAU;
     this.boss = { x: p.x + Math.cos(a) * p.r * 9, y: p.y + Math.sin(a) * p.r * 9, size: p.r * B.sizeMult, hp: 1, attackT: 4, hitCd: 0, hitAnim: 0, flash: 0,
       face: 1, walk: 0, vx: 0, vy: 0, charge: 0, chargeX: 0, chargeY: 0, punchT: 0, intro: 2.5 };
+    this.boss.need = this.hpScale(this.world) / 1.6; // Boss-Härte beim Erscheinen festhalten
+    // Reine Arena: alle Objekte verpuffen, es spawnt nichts mehr, bis ZORNOS fällt
+    for (const o of this.objects) if (this.inView(o)) this.puff(o.x, o.y, o.size * 0.8, '#5a2a1a');
+    this.objects = [];
     this.bossShots = [];
     this.event = null; this.nextEventAt = Infinity; this.quest = null; this.questT = Infinity; this.meteors = [];
     this.hook('onBoss', 'spawn', this.boss);
@@ -668,7 +672,7 @@ export class Game {
     const b = this.boss; if (!b) return;
     const hp = C.BOSS.hp * (this.map.hpMult || 1);
     b.hp -= amountHits / hp; b.hitAnim = 1; b.flash = 1;
-    this.addBerserk(0.01);
+    this.addBerserk(C.BOSS.berserkPerHit);
     if (b.hp <= 0) this.bossDefeated();
   }
 
@@ -732,10 +736,12 @@ export class Game {
     }
     // Geschosse
     const hurt = (pct, nx, ny) => {
-      if (p.hurtCd > 0 || p.berserkT > 0) return;
-      p.rage -= S.rageMax * pct / 100 * S.hazardMult; p.hurtT = 0.45; p.hurtCd = 0.8; this.shake = Math.min(1.5, this.shake + 0.7);
+      if (p.hurtCd > 0) return;
+      // Schutz wirkt gegen den Boss nur abgeschwächt (Wurzel), Berserker halbiert statt unverwundbar
+      const m = Math.sqrt(S.hazardMult) * (p.berserkT > 0 ? 0.5 : 1);
+      p.rage -= S.rageMax * pct / 100 * m; p.hurtT = 0.45; p.hurtCd = 0.8; this.shake = Math.min(1.5, this.shake + 0.7);
       p.vx = nx * maxV * 2.4; p.vy = ny * maxV * 2.4; this.sfx('hurt');
-      this.text(p.x, p.y - p.r * 2.2, 'AUA! −' + Math.round(pct * S.hazardMult) + '% Wut', '#ff5a5a', 1, p.r * 0.8, true);
+      this.text(p.x, p.y - p.r * 2.2, 'AUA! −' + Math.round(pct * m) + '% Wut', '#ff5a5a', 1, p.r * 0.8, true);
     };
     for (const sh of this.bossShots) {
       if (sh.kind === 'ring') {
@@ -766,12 +772,14 @@ export class Game {
     if (d < minD) {
       const nx = -dx / d, ny = -dy / d; // vom Spieler zum Boss
       if (b.charge > 0) { hurt(B.chargeDamage, -nx, -ny); b.charge = 0; }
+      else if (p.dashT <= 0 && b.intro <= 0) hurt(B.touchDamage, -nx, -ny); // Glut-Haut: dranbleiben kostet Wut
+      const dashed = p.dashT > 0;
       if (b.hitCd <= 0) {
         const approach = Math.max(0, p.vx * nx + p.vy * ny);
-        let hits = clamp(approach / (S.speed * p.r), 0.45, 1.3) * S.damage / this.bossDamageNeed();
-        if (p.dashT > 0) hits *= 2.5 * S.dashDamage;
-        if (p.berserkT > 0) hits *= C.BERSERK.damageMult;
-        b.hitCd = 0.18; p.punchT = 0.16; p.punchX = nx; p.punchY = ny;
+        let hits = clamp(approach / (S.speed * p.r), 0.45, 1.3) * S.damage / this.bossDamageNeed() * (p.dashT > 0 ? 1 : C.BOSS.hugMult);
+        if (p.dashT > 0) hits *= C.BOSS.dashMult * Math.pow(S.dashDamage, 0.25);
+        if (p.berserkT > 0) hits *= C.BOSS.berserkMult; // im Bosskampf gedämpft
+        b.hitCd = p.dashT > 0 ? 0.45 : 0.18; p.punchT = 0.16; p.punchX = nx; p.punchY = ny;
         this.sfx('hit', 1); this.text(b.x, b.y - b.size * 1.8, '-' + (hits / (C.BOSS.hp * (this.map.hpMult || 1)) * 100).toFixed(1) + '%', '#ffd23f', 0.6, p.r * 0.6);
         for (let i = 0; i < 6; i++) { const a = Math.random() * TAU, v = rand(2, 5) * p.r; this.particle(b.x - nx * b.size * 0.7, b.y - ny * b.size * 0.7 - b.size * 0.5, i % 2 ? '#ffd23f' : '#ff3b2f', p.r * 0.15, 0.4, Math.cos(a) * v, Math.sin(a) * v, 'spark'); }
         this.bossHurt(hits);
@@ -780,11 +788,19 @@ export class Game {
       const overlap = minD - d; p.x += nx * -overlap; p.y += ny * -overlap;
       const vn = p.vx * nx + p.vy * ny; if (vn > 0) { p.vx -= vn * nx; p.vy -= vn * ny; }
       if (p.dashT > 0) p.dashT = 0;
+      if (dashed) { p.vx = -nx * maxV * 2; p.vy = -ny * maxV * 2; } // Ansturm prallt ab → raus, ausweichen, wieder rein
     }
   }
 
   // Wie viel "Schaden" ein normaler Treffer in dieser Welt braucht (Boss-HP sind in Treffern gemessen)
-  bossDamageNeed() { return this.hpScale(this.world) / 1.6; }
+  // Boss-Schaden: Treffer zählen in "Boss-Treffern". Die Stärke (Schaden ÷ Boss-Härte) streut zwischen
+  // knapp angekommen (~0,02) und komplett ausgebaut (~400) – deshalb gestaucht (^0,25) und gedeckelt,
+  // damit der Kampf immer ein Kampf bleibt: Upgrades machen ihn schneller, aber nie zur Sekundensache.
+  bossPower() {
+    const B = C.BOSS, need = (this.boss && this.boss.need) || this.hpScale(this.world) / 1.6;
+    return clamp(Math.pow(this.stats.damage / need, B.powerExp), B.powerMin, B.powerMax);
+  }
+  bossDamageNeed() { return this.stats.damage / this.bossPower(); }
 
   spawnMinion(x, y) {
     const p = this.p, size = p.r * 0.9, hp = Math.pow(size, 1.5) * this.hpScale(this.world);
@@ -954,7 +970,7 @@ export class Game {
     this.processExplosions();
     if (this.evo('slam1')) this.blasts.push({ t: 0.4, r: R * 1.5, dmg: dmg, slam: true });
     if (this.evo('slam2')) { this.stunT = 4; this.coinPullT = 1.5; }
-    if (this.boss && Math.hypot(this.boss.x - p.x, this.boss.y - p.y) < R + this.boss.size) this.bossHurt(3 * S.slamDamage * S.damage / this.bossDamageNeed() * (p.berserkT > 0 ? C.BERSERK.damageMult : 1));
+    if (this.boss && Math.hypot(this.boss.x - p.x, this.boss.y - p.y) < R + this.boss.size) this.bossHurt(3 * Math.sqrt(S.slamDamage) * S.damage / this.bossDamageNeed() * (p.berserkT > 0 ? C.BOSS.berserkMult : 1));
   }
 
   flushCoinPool() {

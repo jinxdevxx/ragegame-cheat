@@ -504,13 +504,21 @@ export const BOSS = {
   name: 'ZORNOS',
   title: 'der Höllenfürst',
   sizeMult: 2.4,           // immer so viel größer als du
-  hp: 70,                  // Lebenspunkte in "Welt-Treffern" (× Welt-Härte); Ansturm/Berserker helfen enorm
+  hp: 190,                 // Lebenspunkte in "Boss-Treffern" (ein Ansturm-Treffer ≈ 1,7–4,8)
+  powerExp: 0.15,          // Stärke (Schaden ÷ Boss-Härte) wird gestaucht …
+  powerMin: 0.6,           // … und gedeckelt: knapp angekommen 0,6, ausgemaxt höchstens 1,4
+  powerMax: 1.4,
+  hugMult: 0.35,           // normale Kontakt-Schläge (ohne Ansturm) zählen nur so viel
+  berserkPerHit: 0.005,
+  dashMult: 2.2,           // Ansturm-Treffer (× vierte Wurzel aus Ansturm-Bonus)
+  berserkMult: 1.5,        // Berserker-Schaden gegen den Boss (statt voller Bonus)    // Berserker-Ladung pro Boss-Treffer
   speed: 0.45,             // Verfolgungs-Tempo relativ zu deinem Tempo
-  attackEvery: [3.2, 4.5], // Sekunden zwischen Angriffen (unter 30 % Leben 40 % schneller)
-  ringDamage: 16,          // % Wut bei Treffer durch Feuerring
-  meteorDamage: 12,        // % Wut bei Meteortreffer
-  chargeDamage: 20,        // % Wut beim Sturmangriff
-  fireballDamage: 10,      // % Wut pro Feuerball (nur in der Wutphase unter 30 % Leben)
+  attackEvery: [2.6, 3.8], // Sekunden zwischen Angriffen (unter 30 % Leben 40 % schneller)
+  ringDamage: 20,          // % Wut bei Treffer durch Feuerring
+  meteorDamage: 16,        // % Wut bei Meteortreffer
+  chargeDamage: 26,        // % Wut beim Sturmangriff
+  fireballDamage: 12,      // % Wut pro Feuerball (nur in der Wutphase unter 30 % Leben)
+  touchDamage: 7,          // % Wut, wenn man am Boss klebt (außer im Ansturm) – Hit & Run statt Kuscheln
   rewardScrap: 3000,       // × Welt-Schrott-Multiplikator
   rewardChaos: 250000,
   rewardDM: 250,           // ◆ Dunkle Materie
