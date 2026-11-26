@@ -1,7 +1,7 @@
 // =====================================================================
 //  RAGEVERSE – Spiel-Logik (Simulation, keine Grafik)
 // =====================================================================
-import * as C from './config.js?v=0.8.0';
+import * as C from './config.js?v=0.8.1';
 
 const TAU = Math.PI * 2;
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -201,7 +201,7 @@ export class Game {
   hr() { return this.p.r * (this.p.berserkT > 0 ? C.BERSERK.sizeBoost : 1); }
   breakLimit() {
     const glass = this.event && this.event.id === 'glass';
-    return this.p.r * this.stats.breakRatio * (glass ? 1.4 : 1) * (this.p.berserkT > 0 ? C.BERSERK.breakBoost : 1) * (this.p.phoenixT > 0 ? 1.5 : 1);
+    return this.p.r * this.stats.breakRatio * (glass ? 1.4 : 1) * (this.p.berserkT > 0 ? C.BERSERK.breakBoost : 1);
   }
   targetZoom() { return (Math.min(this.vw, this.vh) * 0.06) / this.p.r; }
   viewRadius() { return Math.hypot(this.vw, this.vh) / 2 / this.cam.zoom; }
@@ -253,16 +253,25 @@ export class Game {
     if (input.skill && p.skillCd <= 0 && this.char.skill) this.useSkill();
     input.skill = false;
     this.updateSkills(dt);
-    const maxV = S.speed * p.r * (berserk ? C.BERSERK.speedMult : 1) * (p.rushT > 0 ? 1.8 : 1);
-    if (p.rushT > 0) p.dashCd = 0;
+    const maxV = S.speed * p.r * (berserk ? C.BERSERK.speedMult : 1) * (p.rushT > 0 ? 1.15 : 1);
+    if (p.rushT > 0) { // Schallmauer: Überschall-Ringe
+      p.boomT = (p.boomT || 0) - dt;
+      if (p.boomT <= 0) { p.boomT = 0.35; this.explosionQueue.push({ x: p.x, y: p.y, r: p.r * 3.2, dmg: this.oneHit() * 4, big: false, maxSize: this.breakLimit() * 1.15, silent: true }); this.rings.push({ x: p.x, y: p.y, r: p.r * 3.2, life: 0.35, max: 0.35, color: '#7fd3ff', ground: true }); this.processExplosions(); }
+    }
     if (p.dashT > 0 && this.evo('dash1')) { // Flammen-Ansturm: Feuerspur
       const last = this.lava[this.lava.length - 1];
       if (!last || Math.hypot(last.x - p.x, last.y - p.y) > p.r * 0.7) this.lava.push({ x: p.x, y: p.y, r: p.r * 1.1, life: 1.4, tick: 0 });
     }
-    if (p.phoenixT > 0) {
-      p.vx = p.lookX * maxV * 3; p.vy = p.lookY * maxV * 3; p.hurtCd = Math.max(p.hurtCd, 0.2);
-      if (Math.random() < 0.9) this.particle(p.x, p.y - p.r, Math.random() < 0.5 ? '#ff6a1f' : '#ffd23f', p.r * 0.4, 0.5, 0, 0, 'flame');
-    } else if (p.dashT > 0) {
+    if (p.phoenixT > 0) { // Phönixfeuer: Flammenkranz verbrennt alles in der Nähe
+      p.fireTick = (p.fireTick || 0) - dt;
+      if (p.fireTick <= 0) {
+        p.fireTick = 0.2; const R = p.r * 3.8, lim = this.breakLimit() * 1.5, hit = this.oneHit();
+        for (const o of this.objects) { if (o.dead || o.size > lim) continue; if (Math.hypot(o.x - p.x, o.y - p.y) > R + o.size * 0.5) continue; o.hp -= hit * 3; o.flash = 1; if (o.hp <= 0) { this.kill(o, 'boom'); p.rage = Math.min(S.rageMax, p.rage + S.rageMax * 0.02); } }
+        if (this.boss && Math.hypot(this.boss.x - p.x, this.boss.y - p.y) < R + this.boss.size) this.bossHurt(0.3 * S.damage / this.bossDamageNeed());
+      }
+      for (let i = 0; i < 2; i++) { const a = Math.random() * TAU; this.particle(p.x + Math.cos(a) * p.r * 3.8, p.y + Math.sin(a) * p.r * 3.8 * 0.6, Math.random() < 0.5 ? '#ff6a1f' : '#ffd23f', p.r * 0.35, 0.5, 0, -p.r * 2, 'flame'); }
+    }
+    if (p.dashT > 0) {
       p.dashT -= dt;
       if (p.dashT <= 0 && this.evo('dash2')) { // Meteor-Ansturm
         this.explode(p.x, p.y, p.r * 3.2, this.oneHit() * 5, true);
@@ -501,14 +510,13 @@ export class Game {
       if (d >= minD) continue;
       // Krümel zerbröseln nur sofort, wenn ein Schlag sie auch schaffen würde (Schaden zählt bis ins Late-Game)
       if ((o.size < p.r * C.PLAYER.crumbRatio || (o.pulled > 0 && o.size <= limit * 0.65)) && o.hp <= this.oneHit()) { this.kill(o, 'touch'); continue; }
-      if (p.phoenixT > 0 && o.size <= limit) { this.kill(o, 'hit'); continue; } // Feuerflug vernichtet alles auf dem Weg
       if (berserk && this.evo('berserk1') && o.size <= limit) { this.kill(o, 'hit'); continue; } // Titanenwut
       const nx = d > 1e-6 ? dx / d : 1, ny = d > 1e-6 ? dy / d : 0;
       const breakable = o.size <= limit || o.mother; // Mutter Mary Jane ist riesig, aber angreifbar
       if (breakable && o.hitCd <= 0) {
         const approach = Math.max(0, p.vx * nx + p.vy * ny);
         let impact = clamp(approach / (S.speed * p.r), 0.45, 1.3);
-        if (p.dashT > 0) impact *= 2.5 * S.dashDamage;
+        if (p.dashT > 0 || p.rushT > 0) impact *= 2.5 * S.dashDamage;
         let dmg = S.damage * Math.pow(p.r, 1.5) * 0.6 * impact;
         if (glass) dmg *= 100;
         if (this.freezeT > 0) dmg *= 10;
@@ -832,20 +840,20 @@ export class Game {
       case 'singularity': this.singularity = { x: p.x + p.lookX * p.r * 4, y: p.y + p.lookY * p.r * 4, t: 4, tick: 0 }; break;
       case 'freeze': this.freezeT = 5; if (this.boss) this.boss.frozen = 2.5; this.flash = 0.5; break;
       case 'grab': {
-        const targets = this.objects.filter(o => !o.dead && o.size <= lim * 1.2).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y)).slice(0, 6)
-          .filter(o => Math.hypot(o.x - p.x, o.y - p.y) < p.r * 9);
+        const targets = this.objects.filter(o => !o.dead && o.size <= lim * 1.3).sort((a, b) => Math.hypot(a.x - p.x, a.y - p.y) - Math.hypot(b.x - p.x, b.y - p.y)).slice(0, 10)
+          .filter(o => Math.hypot(o.x - p.x, o.y - p.y) < p.r * 12);
         for (const o of targets) { this.grabFx.push({ x: o.x, y: o.y, life: 0.4 }); this.kill(o, 'hit'); }
         if (this.boss && Math.hypot(this.boss.x - p.x, this.boss.y - p.y) < p.r * 9 + this.boss.size) this.bossHurt(4 * S.damage / this.bossDamageNeed());
         this.objects = this.objects.filter(o => !o.dead);
         break;
       }
       case 'rockets': {
-        const targets = this.objects.filter(o => !o.dead && o.size <= lim * 1.3 && this.inView(o)).sort(() => Math.random() - 0.5).slice(0, 10);
+        const targets = this.objects.filter(o => !o.dead && o.size <= lim * 1.3 && this.inView(o)).sort((a, b) => b.size - a.size).slice(0, 16);
         if (this.boss && this.inView(this.boss)) for (let i = 0; i < 3; i++) targets.push(this.boss);
         targets.forEach((o, i) => this.rockets.push({ x: p.x, y: p.y - p.r, tx: o.x, ty: o.y, target: o, t: 0, dur: 0.45 + i * 0.05 }));
         break;
       }
-      case 'phoenixdash': p.phoenixT = 1; break;
+      case 'phoenixdash': p.phoenixT = 6; p.fireTick = 0; this.rings.push({ x: p.x, y: p.y, r: p.r * 3, life: 0.6, max: 0.6, color: '#ff6a1f', ground: true }); break;
       case 'urfaust': { // Urzorn: Druckwelle über den ganzen Bildschirm
         const vr = this.viewRadius();
         this.explosionQueue.push({ x: p.x, y: p.y, r: vr, dmg: hit * 4, big: true, maxSize: lim * 1.3, noStop: true });

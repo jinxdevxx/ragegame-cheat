@@ -6,6 +6,20 @@
 
 export const PATCH_NOTES = [
   {
+    version: '0.8.1',
+    date: '2026-11-26',
+    title: 'Skills mit Sinn',
+    summary: 'Alle Monster-Skills geprüft: Skills, die im Endgame neben einem ausgebauten Ansturm nutzlos waren, wurden neu gemacht.',
+    changes: [
+      'Phönix: „Feuerflug“ ersetzt durch 🔥 Phönixfeuer – 6 s lang verbrennt ein Flammenkranz alles um dich (auch bis 150 % deiner Zerstörbarkeit), jede Zerstörung darin gibt Wut zurück. Die Wiedergeburt bleibt.',
+      'Flitzer: „Turbo-Rausch“ ersetzt durch 💨 Schallmauer – jeder Zusammenstoß trifft wie ein Ansturm und alle 0,35 s knallt ein Überschall-Ring um dich.',
+      'Kraken: Tentakelgriff packt jetzt 10 statt 6 Objekte (bis 130 %), Abklingzeit 8 s.',
+      'Mecha-Rex: 16 statt 10 Raketen, die gezielt die größten Ziele treffen.',
+      'Easter-Egg-Karte: komplett neue Grafik – eine Hanfplantage von oben mit echten gezackten Blättern, Pflanzenreihen, Erdwegen, Lichtungen und Rauchschwaden.',
+      'Kush-Skin: kleiner Joke – statt Schlag-Arm gibt es jetzt einen Joint mit glühender Spitze (nur bei diesem Skin).',
+    ],
+  },
+  {
     version: '0.8.0',
     date: '2026-11-26',
     title: 'Grüner Daumen',

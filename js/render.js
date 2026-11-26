@@ -3,9 +3,9 @@
 //  Reihenfolge: Boden → Trümmer-Flecken → Schatten/Objekte/Monster
 //  (nach Tiefe sortiert) → Trümmer → Münzen → Effekte → Overlays
 // =====================================================================
-import { SPRITES, OUT } from './sprites.js?v=0.8.0';
-import { drawMonster } from './monster.js?v=0.8.0';
-import { shadeHex as sh, shadeHex } from './game.js?v=0.8.0';
+import { SPRITES, OUT } from './sprites.js?v=0.8.1';
+import { drawMonster } from './monster.js?v=0.8.1';
+import { shadeHex as sh, shadeHex } from './game.js?v=0.8.1';
 
 const TAU = Math.PI * 2;
 const STARS = Array.from({ length: 220 }, () => ({ x: Math.random(), y: Math.random(), s: Math.random() * 1.8 + 0.4, p: Math.random() * 0.6 + 0.1, tw: Math.random() * 6 }));
@@ -25,7 +25,9 @@ const fbm = (x, y, seed) => vnoise(x, y, seed) * 0.62 + vnoise(x * 2.7, y * 2.7,
 
 function drawGround(c, g, W, H, sx, sy, z, world, time) {
   const cam = g.cam;
-  const S = Math.max(10, world.minRadius);
+  let S = Math.max(10, world.minRadius);
+  // Ein-Welt-Karten (420): Bodenmaßstab wächst in 4er-Schritten mit, sonst wird das Muster riesig oder winzig
+  if (g.map && g.map.goal && g.p) S = Math.max(10, Math.pow(4, Math.floor(Math.log(Math.max(10, g.p.r * 0.7)) / Math.log(4))));
   const v = { x0: cam.x - W / 2 / z - S, x1: cam.x + W / 2 / z + S, y0: cam.y - H / 2 / z - S, y1: cam.y + H / 2 / z + S };
   const ctx = { c, g, W, H, sx, sy, z, world, time, S, v, px: w => w * z };
   c.fillStyle = world.bg; c.fillRect(0, 0, W, H);
@@ -210,6 +212,34 @@ const A = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >
 function gearShape(c, X, Y, r, teeth, rot) { c.beginPath(); for (let i = 0; i < teeth * 2; i++) { const a = rot + i / (teeth * 2) * TAU, rr = i % 2 ? r * 0.8 : r; c.lineTo(X + Math.cos(a) * rr, Y + Math.sin(a) * rr); } c.closePath(); }
 function wavyLine(c, X, Y, w, amp, n) { c.beginPath(); for (let i = 0; i <= n; i++) { const x = X - w / 2 + i / n * w; c.lineTo(x, Y + Math.sin(i / n * TAU * 2) * amp); } c.stroke(); }
 
+// Hanfblatt für die Boden-Deko (ohne Umriss): 7 schmale, spitze, gezackte Fiederblätter mit heller Mittelrippe
+function hempLeaflet(c, X, Y, L, W, ang) {
+  const ca = Math.cos(ang), sa = Math.sin(ang), n = 9, pts = [];
+  for (let side = -1; side <= 1; side += 2) for (let i = 0; i <= n; i++) {
+    const k = side < 0 ? i : n - i, t = k / n, w = W * Math.pow(Math.sin(Math.PI * Math.min(1, t * 1.08)), 0.9) * (k % 2 ? 1.18 : 0.82); // Zacken
+    pts.push([t * L, side * w]);
+  }
+  c.beginPath(); c.moveTo(X, Y);
+  for (const [u, v] of pts) c.lineTo(X + ca * u - sa * v, Y + sa * u + ca * v);
+  c.closePath(); c.fill();
+}
+function hempLeaf(c, X, Y, size, rot, col, vein) {
+  c.fillStyle = col;
+  const F = [[0, 1, 0.13], [0.42, 0.88, 0.12], [-0.42, 0.88, 0.12], [0.85, 0.66, 0.1], [-0.85, 0.66, 0.1], [1.3, 0.4, 0.075], [-1.3, 0.4, 0.075]];
+  for (const [a, l, w] of F) hempLeaflet(c, X, Y, size * l, size * w, rot + a);
+  if (vein) { c.strokeStyle = vein; c.lineWidth = Math.max(0.6, size * 0.025); c.beginPath(); for (const [a, l] of F) { c.moveTo(X, Y); c.lineTo(X + Math.cos(rot + a) * size * l * 0.92, Y + Math.sin(rot + a) * size * l * 0.92); } c.stroke(); }
+}
+// ganze Pflanze von oben: Fächerblätter im Kreis + Blüte (Cola) in der Mitte
+function hempPlant(c, X, Y, u, seed) {
+  const rot = seed * TAU, dark = '#24611f', mid = '#3b8a2e', light = '#5aac3e';
+  c.fillStyle = 'rgba(15,40,10,0.35)'; c.beginPath(); c.arc(X + u * 0.06, Y + u * 0.08, u * 0.62, 0, TAU); c.fill();
+  for (let i = 0; i < 6; i++) hempLeaf(c, X, Y, u * 0.58, rot + i * TAU / 6, i % 2 ? dark : mid, 'rgba(160,220,120,0.35)');
+  for (let i = 0; i < 5; i++) hempLeaf(c, X, Y, u * 0.36, rot + 0.5 + i * TAU / 5, light, 'rgba(200,240,160,0.4)');
+  c.fillStyle = '#8fd06a'; c.beginPath(); c.arc(X, Y, u * 0.12, 0, TAU); c.fill();
+  c.fillStyle = 'rgba(255,170,80,0.85)'; for (let k = 0; k < 7; k++) { const a = k * 0.9 + seed * 7; c.beginPath(); c.arc(X + Math.cos(a) * u * 0.08, Y + Math.sin(a) * u * 0.08, u * 0.022, 0, TAU); c.fill(); }
+  c.fillStyle = 'rgba(255,255,255,0.35)'; for (let k = 0; k < 5; k++) { const a = k * 1.3 + seed * 3; c.beginPath(); c.arc(X + Math.cos(a) * u * 0.05, Y + Math.sin(a) * u * 0.05, u * 0.012, 0, TAU); c.fill(); }
+}
+
 const DIM_GROUND = {
   // Kristall: blaue Kristallfelder mit Facetten und Kristallbüscheln
   crystal: { space: true, paint(kk, p, S, sd) {
@@ -372,16 +402,26 @@ const DIM_GROUND = {
     const c = kk.c; c.lineWidth = Math.max(1, S * kk.z * 0.03);
     scatter(kk, S * 1.3, 0.5, 221, (X, Y, u) => { c.strokeStyle = 'rgba(160,120,60,0.35)'; c.beginPath(); c.moveTo(X - u * 0.4, Y); c.quadraticCurveTo(X, Y - u * 0.15, X + u * 0.4, Y); c.stroke(); });
   } },
-  // 420: Felder mit Pflanzenreihen, Erdwege und grüne Rauchschwaden
-  hemp: { bg: p => '#3a2a1a', paint(kk, p, S, sd) {
-    terrain(kk, S * 10, sd, [{ t: 0.3, color: '#2f5a1f', rim: '#1a3a10' }, { t: 0.0, t2: 0.22, color: '#5a4026', rim: '#3a2a1a' }]);
-    const c = kk.c, C = S * 0.9;
-    cells(kk.v, C, (ix, iy) => { const x = ix * C, y = iy * C; if (iy % 3 === 0 || fbm(x / (S * 10), y / (S * 10), sd) < 0.3) return;
-      const X = kk.sx(x + C / 2), Y = kk.sy(y + C / 2), u = C * kk.z;
-      c.fillStyle = 'rgba(30,60,20,0.55)'; c.beginPath(); c.ellipse(X, Y + u * 0.15, u * 0.35, u * 0.15, 0, 0, TAU); c.fill();
-      c.fillStyle = hash(ix, iy, 9) > 0.5 ? '#5ab04a' : '#4a9a3a';
-      for (let k = 0; k < 5; k++) { const a = -Math.PI / 2 + (k - 2) * 0.5; c.beginPath(); c.ellipse(X + Math.cos(a) * u * 0.18, Y + Math.sin(a) * u * 0.18, u * 0.2, u * 0.06, a, 0, TAU); c.fill(); } });
-    scatter(kk, S * 4, 0.45, 241, (X, Y, u, h) => { c.fillStyle = 'rgba(200,240,190,0.09)'; for (let i = 0; i < 4; i++) { c.beginPath(); c.arc(X + Math.cos(i * 1.7 + h * 5) * u * 0.25, Y + Math.sin(i * 1.7) * u * 0.15, u * (0.3 + i * 0.05), 0, TAU); c.fill(); } });
+  // 420: Hanfplantage von oben – Reihen großer Pflanzen auf dunkler Erde, Wege, Lichtungen mit großen Blättern, Rauchschwaden
+  hemp: { bg: p => '#3a2a1c', paint(kk, p, S, sd) {
+    const c = kk.c, C = S * 2.2, sc = S * 14;
+    const zone = (x, y) => fbm(x / sc, y / sc, sd + 3);
+    // Lichtungen (Gras) und Teiche
+    terrain(kk, sc, sd + 3, [{ t: 0.63, color: '#4f9a38', rim: '#3a7a28' }, { t: 0.0, t2: 0.15, color: '#3d7fb0', rim: '#2b5f86' }]);
+    // Erd-Furchen in den Beeten
+    cells(kk.v, C, (ix, iy) => { const x = ix * C, y = iy * C, f = zone(x, y); if (f > 0.63 || f < 0.15) return;
+      const X = kk.sx(x), Y = kk.sy(y), w = C * kk.z;
+      if (iy % 3 === 0) { c.fillStyle = '#9a7a52'; c.fillRect(X - 0.5, Y + w * 0.2, w + 1, w * 0.6); c.fillStyle = 'rgba(0,0,0,0.12)'; c.fillRect(X - 0.5, Y + w * 0.2, w + 1, w * 0.07); return; } // Weg
+      c.fillStyle = 'rgba(0,0,0,0.14)'; c.fillRect(X - 0.5, Y + w * 0.45, w + 1, w * 0.08); });
+    // Pflanzenreihen
+    cells(kk.v, C, (ix, iy) => { if (iy % 3 === 0) return; const x = ix * C, y = iy * C, f = zone(x, y); if (f > 0.63 || f < 0.17) return;
+      hempPlant(c, kk.sx(x + C / 2 + (hash(ix, iy, 5) - 0.5) * C * 0.15), kk.sy(y + C / 2), C * kk.z * (0.82 + hash(ix, iy, 6) * 0.25), hash(ix, iy, 7)); });
+    // große einzelne Blätter auf den Lichtungen
+    scatter(kk, S * 3.5, 0.5, 244, (X, Y, u, h, x, y) => { if (zone(x, y) < 0.66) return; hempLeaf(c, X, Y, u * 0.35, h * TAU, 'rgba(40,110,35,0.55)', 'rgba(150,210,110,0.4)'); });
+    // Gras-Tupfen
+    scatter(kk, S * 0.8, 0.5, 243, (X, Y, u, h, x, y) => { if (zone(x, y) < 0.63) return; c.strokeStyle = 'rgba(25,70,20,0.45)'; c.lineWidth = 1; c.beginPath(); c.moveTo(X, Y); c.lineTo(X - u * 0.05, Y - u * 0.15); c.moveTo(X, Y); c.lineTo(X + u * 0.06, Y - u * 0.13); c.stroke(); });
+    // weiche Rauchschwaden
+    scatter(kk, S * 8, 0.45, 241, (X, Y, u, h) => { for (let i = 0; i < 4; i++) { const cx = X + Math.cos(i * 1.7 + h * 5) * u * 0.25, cy = Y + Math.sin(i * 1.3) * u * 0.12, g = c.createRadialGradient(cx, cy, 0, cx, cy, u * 0.32); g.addColorStop(0, 'rgba(230,255,220,0.13)'); g.addColorStop(1, 'rgba(230,255,220,0)'); c.fillStyle = g; c.fillRect(cx - u * 0.35, cy - u * 0.35, u * 0.7, u * 0.7); } });
   } },
   // Chaos: bunte Wirbel und Risse
   chaos: { space: true, paint(kk, p, S, sd) {
@@ -567,7 +607,7 @@ const GROUNDS = {
     const { c, z, world, time } = k, T = DIM_GROUND[world.theme] || DIM_GROUND.crystal;
     if (T.space) drawSpace(c, k.g, k.W, k.H, z, world, time);
     else { c.fillStyle = T.bg ? T.bg(world.pal) : world.pal[0]; c.fillRect(0, 0, k.W, k.H); }
-    cached(k, 'dim-' + world.theme, kk => T.paint(kk, world.pal, k.S, 70 + (world.minRadius % 97)));
+    cached(k, 'dim-' + world.theme + ':' + k.S, kk => T.paint(kk, world.pal, k.S, 70 + (world.minRadius % 97)));
   },
 
   // ---------------- Höllenschlund (Welt 50): Obsidian, Asche, Lavaflüsse, aufsteigende Glut
@@ -908,6 +948,12 @@ export function render(c, g, W, H, time) {
     const a = Math.min(1, L.life / 1.5);
     c.fillStyle = `rgba(255,90,20,${0.55 * a})`; c.beginPath(); c.ellipse(sx(L.x), sy(L.y), L.r * z, L.r * z * 0.55, 0, 0, TAU); c.fill();
     c.fillStyle = `rgba(255,210,63,${0.5 * a})`; c.beginPath(); c.ellipse(sx(L.x), sy(L.y), L.r * z * 0.55, L.r * z * 0.3, 0, 0, TAU); c.fill();
+  }
+  if (p.phoenixT > 0) { // Phönixfeuer: flackernder Flammenkranz am Boden
+    const X = sx(p.x), Y = sy(p.y), R = p.r * 3.8 * z, fl = 0.85 + Math.sin(time * 18) * 0.15;
+    const gr = c.createRadialGradient(X, Y, R * 0.55, X, Y, R * 1.05); gr.addColorStop(0, 'rgba(255,90,20,0)'); gr.addColorStop(0.75, `rgba(255,120,30,${0.45 * fl})`); gr.addColorStop(1, 'rgba(255,210,63,0)');
+    c.fillStyle = gr; c.beginPath(); c.ellipse(X, Y, R * 1.05, R * 0.6, 0, 0, TAU); c.fill();
+    c.strokeStyle = `rgba(255,210,63,${0.6 * fl})`; c.lineWidth = Math.max(2, p.r * z * 0.12); c.beginPath(); c.ellipse(X, Y, R, R * 0.57, 0, 0, TAU); c.stroke();
   }
   if (g.singularity) {
     const s2 = g.singularity, X = sx(s2.x), Y = sy(s2.y), R = p.r * z * 1.3;

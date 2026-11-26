@@ -8,8 +8,8 @@
 //  Sternenstaub und Aura dazu. Premium-Skins (Silber, Gold, Platin, Gott)
 //  färben das Monster metallisch und legen Glanz, Funkeln und Aura darüber.
 // =====================================================================
-import * as C from './config.js?v=0.8.0';
-import { shadeHex as sh } from './game.js?v=0.8.0';
+import * as C from './config.js?v=0.8.1';
+import { shadeHex as sh } from './game.js?v=0.8.1';
 
 const TAU = Math.PI * 2;
 const OUT = '#1f1212';
@@ -66,6 +66,7 @@ function mouth(c, R, s, x, y, w, opt = {}) {
 // Schlag-Arm: zeigt in Richtung des Ziels
 function punchArm(c, R, s, ax, ay, col, opt = {}) {
   const pt = s.punchT > 0 ? Math.min(1, s.punchT / 0.16) : 0;
+  if (s.skin === 'kush') return joint(c, R, s, ax, ay, pt); // Kush-Skin: kleiner Joke statt Arm
   const reach = R * (opt.reach || 0.35) + R * pt * 0.55;
   const px = Math.max(0.2, s.punchX * s.face), py = s.punchY || 0;
   const hx = ax + px * reach, hy = ay + py * reach * 0.6 + (s.slamT > 0 ? R * 0.35 : 0);
@@ -82,6 +83,18 @@ function punchArm(c, R, s, ax, ay, col, opt = {}) {
     c.fillStyle = opt.claws || '#fff6dc';
     for (let i = -1; i <= 1; i++) { tri(c, hx + fr * 0.75, hy + i * fr * 0.45, hx + fr * 1.5, hy + i * fr * 0.45 - fr * 0.12, hx + fr * 0.8, hy + i * fr * 0.45 + fr * 0.25); c.fill(); }
   }
+}
+// Kush-Skin: Joint mit glühender Spitze und Rauchkringeln
+function joint(c, R, s, ax, ay, pt) {
+  const t = s.time || 0, L = R * (0.75 + pt * 0.15), x0 = ax - R * 0.15, y0 = ay + R * 0.05, x1 = x0 + L, y1 = y0 - R * 0.1;
+  c.save(); lw(c, R, 0.05);
+  c.beginPath(); c.moveTo(x0, y0 - R * 0.045); c.lineTo(x1, y1 - R * 0.075); c.lineTo(x1, y1 + R * 0.075); c.lineTo(x0, y0 + R * 0.045); c.closePath(); P(c, '#fbf6ea');
+  c.fillStyle = '#c9a77a'; c.beginPath(); c.moveTo(x0, y0 - R * 0.045); c.lineTo(x0 + R * 0.14, y0 - R * 0.06); c.lineTo(x0 + R * 0.14, y0 + R * 0.06); c.lineTo(x0, y0 + R * 0.045); c.closePath(); c.fill(); // Filter
+  const gl = 0.7 + Math.sin(t * 6) * 0.3;
+  c.fillStyle = `rgba(255,${120 + gl * 80},40,1)`; c.beginPath(); c.ellipse(x1, y1, R * 0.05, R * 0.075, 0, 0, TAU); c.fill(); c.stroke();
+  c.fillStyle = 'rgba(255,240,150,' + (0.6 * gl) + ')'; c.beginPath(); c.arc(x1 + R * 0.02, y1, R * 0.035, 0, TAU); c.fill();
+  for (let i = 0; i < 4; i++) { const ph = (t * 0.6 + i / 4) % 1; c.fillStyle = `rgba(225,250,215,${0.55 * (1 - ph)})`; c.beginPath(); c.arc(x1 + R * (0.05 + Math.sin(ph * 6 + i) * 0.08), y1 - R * (0.1 + ph * 0.9), R * (0.05 + ph * 0.12), 0, TAU); c.fill(); }
+  c.restore();
 }
 function leg(c, R, x, lift, col, w = 0.36, h = 0.5, toes = null) {
   c.beginPath(); c.roundRect(x, -R * h - lift, R * w, R * h + R * 0.02, R * 0.14); P(c, col);
