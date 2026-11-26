@@ -1,12 +1,12 @@
 // =====================================================================
 //  RAGEVERSE – Einstieg: Game-Loop, Steuerung, Menüs, Shop, Updates
 // =====================================================================
-import * as C from './config.js?v=0.8.4';
-import { monsterData, talentRank, talentFree, canRaiseTalent, raiseTalent, Game, computeStats, upgradeLevel, upgradeCost, fmt, money, tierOf, charDef, mapDef, dmLevel, dmCost, prestigeGain, doPrestige } from './game.js?v=0.8.4';
-import { render, drawMonsterPreview } from './render.js?v=0.8.4';
-import { initAudio, setMuted, setMusic, setIntensity, setVolumes, sfx } from './audio.js?v=0.8.4';
-import { loadSave, writeSave, listSlots, loadSlotInto, createSlot, deleteSlot, getSlot, loadMeta } from './save.js?v=0.8.4';
-import { PATCH_NOTES, VERSION } from './patchnotes.js?v=0.8.4';
+import * as C from './config.js?v=0.8.5';
+import { monsterData, talentRank, talentFree, canRaiseTalent, raiseTalent, Game, computeStats, upgradeLevel, upgradeCost, fmt, money, tierOf, charDef, mapDef, dmLevel, dmCost, prestigeGain, doPrestige } from './game.js?v=0.8.5';
+import { render, drawMonsterPreview } from './render.js?v=0.8.5';
+import { initAudio, setMuted, setMusic, setIntensity, setVolumes, sfx } from './audio.js?v=0.8.5';
+import { loadSave, writeSave, listSlots, loadSlotInto, createSlot, deleteSlot, getSlot, loadMeta } from './save.js?v=0.8.5';
+import { PATCH_NOTES, VERSION } from './patchnotes.js?v=0.8.5';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -224,7 +224,9 @@ function startRun() {
   showBanner(`WELT ${game.world + 1}: ${game.worlds[game.world].name.toUpperCase()}`);
   tutorial();
 }
-function pause() { if (game.state !== 'play' || !inRun) return; game.state = 'paused'; show('screen-pause'); }
+function pause() { if (game.state !== 'play' || !inRun) return; game.state = 'paused'; renderAutoMut(); show('screen-pause'); }
+function renderAutoMut() { const on = !!save.settings.autoMut; const b = $('btn-automut'); b.textContent = `🎲 Mutation automatisch: ${on ? 'AN' : 'AUS'}`; b.classList.toggle('on', on); }
+$('btn-automut').onclick = () => { save.settings.autoMut = !save.settings.autoMut; writeSave(save); renderAutoMut(); sfx('click'); };
 function resume() { if (game.state !== 'paused') return; game.state = 'play'; lastT = performance.now(); keys.clear(); pointer.active = false; show(null); }
 function back() { sfx('click'); if (current === 'screen-help' && helpFrom === 'screen-pause') { show('screen-pause'); return; } openMenu(); }
 
@@ -416,6 +418,7 @@ function renderSettings() {
   document.querySelectorAll('#set-fx button').forEach(b => b.classList.toggle('on', b.dataset.v === st.fx));
   $('set-sfx').value = st.sfx; $('set-music').value = st.music;
   $('set-shake').classList.toggle('on', st.shake);
+  $('set-automut').classList.toggle('on', !!st.autoMut);
   $('set-hints').classList.toggle('on', st.hints);
 }
 function applySettings() {
@@ -431,6 +434,7 @@ $('set-sfx').addEventListener('input', e => { save.settings.sfx = Number(e.targe
 $('set-sfx').addEventListener('change', () => sfx('coin', 6));
 $('set-music').addEventListener('input', e => { save.settings.music = Number(e.target.value); applySettings(); });
 $('set-shake').onclick = () => { save.settings.shake = !save.settings.shake; applySettings(); renderSettings(); sfx('click'); };
+$('set-automut').onclick = () => { save.settings.autoMut = !save.settings.autoMut; applySettings(); renderSettings(); renderAutoMut(); sfx('click'); };
 $('set-hints').onclick = () => { save.settings.hints = !save.settings.hints; applySettings(); renderSettings(); sfx('click'); };
 $('btn-settings-close').onclick = closeSettings;
 $('btn-settings-done').onclick = closeSettings;
@@ -942,6 +946,15 @@ function showMutation(w, choices) {
   $('mut-evo').textContent = '🧬 ' + evo;
   // Sicherheitsnetz: nie ohne Auswahl hängen bleiben
   if (!choices || !choices.length) { game.chooseMutation(null); lastT = performance.now(); showBanner(`WELT ${game.world + 1}: ${game.worlds[game.world].name.toUpperCase()}`); return; }
+  // Auto-Mutation (Pause-Menü): sofort zufällig eine der Karten nehmen, ohne Fenster
+  if (save.settings.autoMut) {
+    const m = choices[Math.floor(Math.random() * choices.length)];
+    game.chooseMutation(m.id);
+    renderMuts();
+    lastT = performance.now();
+    showBanner(`WELT ${game.world + 1}: ${game.worlds[game.world].name.toUpperCase()} · ${m.icon} ${m.name}`);
+    return;
+  }
   $('mut-cards').innerHTML = choices.map(m => `<button class="mut-card" data-mut="${m.id}"><div class="ic">${m.icon}</div><b>${m.name}</b><span>${m.desc}</span></button>`).join('');
   show('screen-mutation');
   // nach 10 s automatisch eine zufällige Karte wählen

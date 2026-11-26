@@ -6,6 +6,18 @@
 
 export const PATCH_NOTES = [
   {
+    version: '0.8.5',
+    date: '2026-11-26',
+    title: 'Mutation auf Autopilot',
+    summary: 'Neuer Schalter: Mutationen werden beim Welt-Aufstieg automatisch gewählt – kein Klicken mehr nötig.',
+    changes: [
+      'Neu unter Escape (Einstellungen) und im Pause-Menü: 🎲 Mutation automatisch. Ist er an, wird beim Aufstieg in die nächste Welt sofort eine zufällige der 3 Mutationen genommen – ohne Fenster, der Run läuft einfach weiter.',
+      'Welche Mutation du bekommen hast, steht kurz im Welt-Banner.',
+      'Die Einstellung wird pro Spielstand gespeichert. Ist sie aus, bleibt alles wie bisher (Auswahl mit 10 s Auto-Wahl).',
+      'Einstellungsfenster etwas kompakter, damit alles ohne Scrollen passt.',
+    ],
+  },
+  {
     version: '0.8.4',
     date: '2026-11-26',
     title: 'Echte Hanfpflanzen',
