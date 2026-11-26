@@ -1,0 +1,329 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>🛠 CHEAT · RAGEVERSE</title>
+  <meta name="description" content="Du bist ein Wut-Monster. Zerstöre alles. Wachse. Zerstöre größere Dinge. Vom Gartenzwerg bis zur Galaxie.">
+  <meta name="theme-color" content="#1a0b0b">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Lilita+One&family=Nunito:wght@600;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css?v=0.8.0">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cellipse cx='50' cy='58' rx='38' ry='36' fill='%23e8432e' stroke='%231f1212' stroke-width='6'/%3E%3Cpath d='M28 30 L20 6 L40 24Z M66 26 L82 4 L76 30Z' fill='%23fff1d6' stroke='%231f1212' stroke-width='5'/%3E%3Ccircle cx='40' cy='50' r='9' fill='white'/%3E%3Ccircle cx='64' cy='50' r='8' fill='white'/%3E%3Cpath d='M30 38 L48 46 M74 38 L58 46' stroke='%231f1212' stroke-width='6' stroke-linecap='round'/%3E%3Cellipse cx='52' cy='72' rx='16' ry='7' fill='%233a0a0a'/%3E%3C/svg%3E">
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- ============ HUD (während des Runs) ============ -->
+  <div id="hud" hidden>
+    <div class="hud-top">
+      <div class="hud-left">
+        <div class="hud-world">
+          <span id="hud-world-num" class="world-num">WELT 1 / 50</span>
+          <span id="hud-world-name">Garten</span>
+          <div class="bar small"><div id="hud-world-bar"></div></div>
+          <span id="hud-world-next" class="muted">→ Straße</span>
+        </div>
+        <div id="hud-quest" class="quest" hidden>
+          <div class="q-title">AUFTRAG</div>
+          <div class="q-label" id="q-label"></div>
+          <div class="bar tiny"><div id="q-bar"></div></div>
+          <div class="q-reward" id="q-reward"></div>
+        </div>
+        <div id="hud-muts" class="muts"></div>
+      </div>
+      <div class="hud-rage">
+        <div class="rage-label">WUT</div>
+        <div class="bar rage"><div id="hud-rage-bar"></div></div>
+      </div>
+      <div class="hud-right">
+        <div class="hud-cur"><span id="hud-scrap">⚙ 0</span></div>
+        <div class="hud-cur chaos"><span>☠</span><span id="hud-chaos">0</span></div>
+        <button id="btn-endrun" class="icon-btn hud-endrun" aria-label="Run beenden, Schrott behalten" title="Run beenden – Schrott behalten">🏁 <span>Run beenden</span></button>
+      </div>
+    </div>
+    <div id="boss-bar" class="boss-bar" hidden>
+      <div class="boss-name">😈 ZORNOS <small>der Höllenfürst</small></div>
+      <div class="bar boss"><div id="boss-hp"></div></div>
+      <div class="boss-tip">Deine Wut ist jetzt dein Leben – weich aus! ⚡ Ansturm durchbricht Feuerringe.</div>
+    </div>
+    <div id="hud-combo" class="combo" hidden></div>
+    <div id="hud-event" class="event-banner" hidden></div>
+    <div id="callout" class="callout" hidden></div>
+    <div id="hint" class="hint" hidden></div>
+    <button id="btn-pause" class="icon-btn hud-pause" aria-label="Pause">❚❚</button>
+
+    <!-- Fähigkeiten -->
+    <div class="abilities" id="abilities">
+      <button class="ab" id="ab-dash" aria-label="Ansturm (Leertaste)">
+        <span class="ab-cd"></span><span class="ab-ic">⚡</span><span class="ab-key">LEER</span><span class="ab-t"></span><span class="ab-name">Ansturm</span>
+      </button>
+      <button class="ab" id="ab-slam" aria-label="Stampfer (E)">
+        <span class="ab-cd"></span><span class="ab-ic">💥</span><span class="ab-key">E</span><span class="ab-t"></span><span class="ab-name">Stampfer</span>
+      </button>
+      <button class="ab skill" id="ab-skill" aria-label="Monster-Skill (F)">
+        <span class="ab-cd"></span><span class="ab-ic" id="ab-skill-ic">📢</span><span class="ab-key">F</span><span class="ab-t"></span><span class="ab-name" id="ab-skill-name">Skill</span>
+      </button>
+      <button class="ab big" id="ab-berserk" aria-label="Berserker (R)">
+        <span class="ab-cd"></span><span class="ab-ic">😡</span><span class="ab-key">R</span><span class="ab-t"></span><span class="ab-name">Berserker</span>
+      </button>
+    </div>
+  </div>
+
+  <div id="banner" class="world-banner" hidden></div>
+
+  <!-- ============ Spielstand wählen ============ -->
+  <section id="screen-slots" class="screen" hidden>
+    <div class="panel wide slots-panel">
+      <h1 class="logo small">RAGE<span>VERSE</span></h1>
+      <h2 class="slots-title">Wähle deinen Spielstand</h2>
+      <div class="slot-grid" id="slot-grid"></div>
+      <div class="btn-row" id="slots-back-row" hidden><button class="btn" id="btn-slots-back">Zurück zum Menü</button></div>
+    </div>
+  </section>
+
+  <!-- ============ Hauptmenü ============ -->
+  <section id="screen-menu" class="screen">
+    <div class="panel menu">
+      <h1 class="logo">RAGE<span>VERSE</span></h1>
+      <div class="menu-hero">
+        <canvas id="menu-monster" width="360" height="300"></canvas>
+        <div class="menu-sel">
+          <div class="sel-chip" id="menu-char"></div>
+          <div class="sel-chip map" id="menu-map"></div>
+        </div>
+      </div>
+      <button class="slot-chip" id="menu-slot" title="Spielstand wechseln">💾 <b id="menu-slot-name"></b> <small>wechseln</small></button>
+      <div class="wallet"><span class="pill"><b id="menu-scrap">⚙ 0</b> <span id="menu-scrap-name">Schrott</span></span><span class="pill chaos">☠ <b id="menu-chaos">0</b> Chaos</span><span class="pill dm" id="menu-dm-pill" hidden>◆ <b id="menu-dm">0</b></span></div>
+      <button class="btn primary big" id="btn-play">WÜTEN!</button>
+      <div class="menu-grid">
+        <button class="btn" id="btn-shop-menu">🦹 Schurkenhöhle</button>
+        <button class="btn" id="btn-chars">👹 Monster</button>
+        <button class="btn" id="btn-maps">🗺 Karten</button>
+        <button class="btn" id="btn-achievements">🏆 Erfolge <span class="pill" id="menu-ach">0/0</span></button>
+        <button class="btn" id="btn-help">❓ Hilfe</button>
+        <button class="btn" id="btn-settings">⚙ Einstellungen <small class="muted">(Esc)</small></button>
+      </div>
+      <div class="menu-stats" id="menu-stats"></div>
+    </div>
+  </section>
+
+  <!-- ============ Werkstatt ============ -->
+  <section id="screen-shop" class="screen" hidden>
+    <div class="panel wide">
+      <div class="shop-head">
+        <div><h2>🦹 Schurkenhöhle</h2><p class="sub tight">Dein geheimes Hauptquartier. Hier planst du die Zerstörung des Rageverse.</p></div>
+        <div class="wallet-col"><div class="pill big-pill"><span id="shop-scrap">⚙ 0</span></div><div class="pill dm" id="shop-dm-pill">◆ <span id="shop-dm">0</span></div></div>
+      </div>
+      <div class="tabs" id="shop-tabs"></div>
+      <p class="sub" id="shop-tab-desc"></p>
+      <div class="shop-grid" id="shop-grid"></div>
+      <div class="btn-row">
+        <button class="btn" data-back>Menü</button>
+        <button class="btn primary" data-play>Nächster Run</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Talente (Skill-Tree je Monster) ============ -->
+  <section id="screen-talents" class="screen" hidden>
+    <div class="panel">
+      <h2 id="tal-title">Talente</h2>
+      <div id="tal-head"></div>
+      <div class="tal-list" id="tal-list"></div>
+      <p class="sub">Jedes Level gibt 1 Punkt (bis Level 99). Kraft & Hunger ab Lvl 1 · Skill-Meister ab Lvl 15 · Signatur ab Lvl 40.</p>
+      <div class="btn-row"><button class="btn primary" id="btn-tal-back">Zurück zu den Monstern</button></div>
+    </div>
+  </section>
+
+  <!-- ============ Monster ============ -->
+  <section id="screen-chars" class="screen" hidden>
+    <div class="panel wide">
+      <div class="shop-head">
+        <h2>Monster</h2>
+        <div class="pill big-pill chaos">☠ <span id="chars-chaos">0</span></div>
+        <div class="pill big-pill" title="Schrott – für Premium-Skins"><span id="chars-scrap">0</span></div>
+      </div>
+      <p class="sub">☠ Chaos schaltet Monster frei. Mit viel Schrott kaufst du Premium-Skins: 🥈 Silber → 🥇 Gold → 💠 Platin → 👑 Gott.</p>
+      <div class="char-grid" id="char-grid"></div>
+      <div class="btn-row">
+        <button class="btn" data-back>Menü</button>
+        <button class="btn primary" data-play>Wüten!</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Karten ============ -->
+  <section id="screen-maps" class="screen" hidden>
+    <div class="panel wide">
+      <h2>Karten</h2>
+      <p class="sub">Neue Karten sind härter, bringen aber viel mehr Schrott und Chaos. Deine Upgrades gelten überall.</p>
+      <div class="map-grid" id="map-grid"></div>
+      <div class="btn-row">
+        <button class="btn" data-back>Menü</button>
+        <button class="btn primary" data-play>Wüten!</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Erfolge & Statistik ============ -->
+  <section id="screen-achievements" class="screen" hidden>
+    <div class="panel wide">
+      <div class="shop-head">
+        <h2>🏆 Erfolge</h2>
+        <div class="pill big-pill" id="ach-count">0/0</div>
+      </div>
+      <div class="tabs" id="ach-tabs">
+        <button class="tab on" data-atab="ach">🏆 Erfolge</button>
+        <button class="tab" data-atab="stats">📊 Statistik</button>
+      </div>
+      <div class="ach-grid" id="ach-grid"></div>
+      <div class="btn-row">
+        <button class="btn" data-back>Menü</button>
+        <button class="btn primary" data-play>Wüten!</button>
+      </div>
+    </div>
+  </section>
+  <div id="ach-toasts" class="ach-toasts"></div>
+
+  <!-- ============ Hilfe ============ -->
+  <section id="screen-help" class="screen" hidden>
+    <div class="panel wide">
+      <h2>So wird gewütet</h2>
+      <div id="help-body" class="help-body"></div>
+      <div class="btn-row">
+        <button class="btn" data-back>Menü</button>
+        <button class="btn primary" data-play>Los geht's!</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Einstellungen ============ -->
+  <section id="screen-settings" class="screen dim" hidden>
+    <div class="panel settings">
+      <div class="shop-head">
+        <h2>Einstellungen</h2>
+        <button class="icon-btn" id="btn-settings-close" aria-label="Schließen">✕</button>
+      </div>
+      <div class="set-list">
+        <div class="set-row">
+          <div><b>Steuerung</b><small id="set-control-desc"></small></div>
+          <div class="seg" id="set-control">
+            <button data-v="keys">⌨ Tastatur</button>
+            <button data-v="mouse">🖱 Maus</button>
+            <button data-v="both">Beides</button>
+          </div>
+        </div>
+        <div class="set-row">
+          <div><b>Soundeffekte</b><small>Lautstärke von Treffern, Münzen, Explosionen</small></div>
+          <input type="range" id="set-sfx" min="0" max="100" step="5">
+        </div>
+        <div class="set-row">
+          <div><b>Musik</b><small>Lautstärke des Beats</small></div>
+          <input type="range" id="set-music" min="0" max="100" step="5">
+        </div>
+        <div class="set-row">
+          <div><b>Bildschirmwackeln</b><small>Wackeln bei Explosionen und großen Treffern</small></div>
+          <button class="toggle" id="set-shake"></button>
+        </div>
+        <div class="set-row">
+          <div><b>Effekte</b><small>Weniger Partikel = flüssiger auf schwachen Geräten</small></div>
+          <div class="seg" id="set-fx">
+            <button data-v="high">Viele</button>
+            <button data-v="low">Wenige</button>
+          </div>
+        </div>
+        <div class="set-row">
+          <div><b>Tipps im Spiel</b><small>Kurze Hinweise zu Steuerung und Fähigkeiten</small></div>
+          <button class="toggle" id="set-hints"></button>
+        </div>
+      </div>
+      <p class="sub keys-hint">Tasten: <kbd>WASD</kbd>/<kbd>Pfeile</kbd> laufen · <kbd>Leertaste</kbd> Ansturm · <kbd>E</kbd> Stampfer · <kbd>F</kbd> Monster-Skill · <kbd>R</kbd> Berserker · <kbd>P</kbd> Pause · <kbd>Esc</kbd> Einstellungen · 🏁 oben rechts: Run beenden</p>
+      <div class="btn-row"><button class="btn primary" id="btn-settings-done">Fertig</button></div>
+    </div>
+  </section>
+
+  <!-- ============ Ergebnis ============ -->
+  <section id="screen-results" class="screen" hidden>
+    <div class="panel results">
+      <h2 id="res-title">Wut verraucht!</h2>
+      <div id="results-body"></div>
+      <div class="btn-row">
+        <button class="btn" id="btn-res-shop">🦹 Schurkenhöhle</button>
+        <button class="btn" id="btn-res-menu">Menü</button>
+        <button class="btn primary" data-play>Nochmal!</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Mutation wählen ============ -->
+  <section id="screen-mutation" class="screen dim" hidden>
+    <div class="mutation-wrap">
+      <div class="mut-title" id="mut-title">STRASSE ERREICHT!</div>
+      <p class="mut-evo" id="mut-evo"></p>
+      <p class="mut-sub">Wähle eine Mutation für diesen Run</p>
+      <div class="mut-cards" id="mut-cards"></div>
+      <p class="sub mut-auto" id="mut-auto"></p>
+    </div>
+  </section>
+
+  <!-- ============ Pause ============ -->
+  <section id="screen-pause" class="screen dim" hidden>
+    <div class="panel small-panel">
+      <h2>Pause</h2>
+      <div class="btn-col">
+        <button class="btn primary" id="btn-resume">Weiter</button>
+        <button class="btn" id="btn-pause-settings">⚙ Einstellungen</button>
+        <button class="btn" id="btn-pause-help">❓ Hilfe</button>
+        <button class="btn" id="btn-quit">🏁 Run beenden – Schrott behalten</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Ecke: Patch Notes / Ton / Update-Hinweis ============ -->
+  <div id="corner">
+    <div id="toast" class="toast" hidden></div>
+    <div class="corner-btns">
+      <button class="corner-btn" id="btn-notes" aria-label="Patch Notes">📜 <span class="lbl">Patch Notes</span><i class="dot" id="notes-dot" hidden></i></button>
+      <button class="corner-btn" id="btn-music" aria-label="Musik an/aus">🎵</button>
+      <button class="corner-btn" id="btn-mute" aria-label="Ton an/aus">🔊</button>
+      <span class="ver" id="ver"></span>
+    </div>
+  </div>
+
+  <!-- ============ Patch Notes Fenster ============ -->
+  <section id="egg-modal" class="screen dim top" hidden>
+    <div class="panel small-panel confirm-panel egg-panel">
+      <div class="egg-icon">🥚🌿</div>
+      <h2>EASTER EGG!</h2>
+      <p class="sub">Du hast ZORNOS besiegt – und dabei etwas Geheimes geweckt.<br><b>Neue Karte „420“ freigeschaltet!</b><br>Eine einzige Welt, 5× zäher als alles davor: Sammle in einem Run 420 goldene Hanfblätter und hau dann Mutter Mary Jane um.</p>
+      <div class="btn-row"><button class="btn" id="egg-later">Später</button><button class="btn primary" id="egg-go">🌿 Zur Karte 420</button></div>
+    </div>
+  </section>
+
+  <section id="confirm-modal" class="screen dim top" hidden>
+    <div class="panel small-panel confirm-panel">
+      <h2 id="confirm-title">Spielstand löschen?</h2>
+      <p class="sub" id="confirm-text"></p>
+      <div class="btn-row">
+        <button class="btn" id="confirm-no">Abbrechen</button>
+        <button class="btn danger-btn" id="confirm-yes">Endgültig löschen</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="notes-modal" class="screen dim top" hidden>
+    <div class="panel notes">
+      <div class="shop-head">
+        <h2>Patch Notes</h2>
+        <button class="icon-btn" id="btn-notes-close" aria-label="Schließen">✕</button>
+      </div>
+      <div class="notes-list" id="notes-list"></div>
+    </div>
+  </section>
+
+  <script type="module" src="js/main.js?v=0.8.0"></script>
+  <script src="js/cheat.js"></script>
+</body>
+</html>
