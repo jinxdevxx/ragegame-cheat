@@ -6,6 +6,18 @@
 
 export const PATCH_NOTES = [
   {
+    version: '0.9.0',
+    date: '2026-11-26',
+    title: 'Urknall lohnt sich',
+    summary: 'Mehr ◆ pro Urknall, günstigerer Masterplan und ein neuer Boss-Perk: Der Weg zu ZORNOS ist jetzt etwa doppelt so schnell – der Anfang bleibt wie er ist.',
+    changes: [
+      'Urknall gibt 50 % mehr ◆ Dunkle Materie.',
+      'Der Böse Masterplan wird pro Stufe langsamer teurer (Schwarzgeld, Wutkern, Mutagen, Ewiger Zorn, Frühstart, Chaostheorie) – mehr ◆ bringt jetzt spürbar mehr Stufen.',
+      'Neuer Perk 😈 Höllenjäger: nur gegen ZORNOS +5 % Schaden und −2 % erlittener Schaden pro Stufe (bis +100 % / −40 %).',
+      'Gemessen mit Bot über viele Runs: Welt 50 und erster ZORNOS-Sieg nach ~100–125 statt ~215 Runs (oder gar nicht). Die ersten ~50 Runs laufen genauso wie vorher.',
+    ],
+  },
+  {
     version: '0.8.9',
     date: '2026-11-26',
     title: 'Direkt zu ZORNOS',

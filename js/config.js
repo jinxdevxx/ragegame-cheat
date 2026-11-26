@@ -922,18 +922,20 @@ export const PRESTIGE = {
   minWorld: 4,          // ab welcher Welt (in diesem Durchgang) der Urknall möglich ist (4 = Kontinent)
   logBase: 5,           // ◆ = floor( (log10(Schrott seit letztem Urknall) − logBase)² × Weltbonus )
   worldBonus: 0.15,     // +15 % ◆ pro Welt über minWorld
+  gainMult: 1.5,        // v0.9.0: ◆ ×1,5 (zusammen mit flacheren Masterplan-Kosten: Weg zu ZORNOS ~215 → ~128 Runs im Bot-Test)
   // Was bleibt: Chaos, Monster, Karten, Rekorde. Was weg ist: Schrott und Upgrades.
 };
 
 // Der Böse Masterplan – permanente Boni, gekauft mit ◆ Dunkler Materie
 export const DM_PERKS = [
-  { id: 'dm_scrap',  name: 'Schwarzgeld',   icon: '💸', desc: '+20 % Schrott pro Stufe (multiplikativ, für immer).', base: 1, growth: 1.25, max: 200, per: 0.2, mult: true },
-  { id: 'dm_power',  name: 'Wutkern',       icon: '❤️‍🔥', desc: '+10 % Schaden pro Stufe (multiplikativ).',          base: 1, growth: 1.25, max: 200, per: 0.1, mult: true },
-  { id: 'dm_growth', name: 'Mutagen',       icon: '🧪', desc: '+5 % Wachstum pro Stufe (multiplikativ).',            base: 2, growth: 1.24, max: 150, per: 0.05, mult: true },
-  { id: 'dm_rage',   name: 'Ewiger Zorn',   icon: '🌋', desc: '+5 % Wut-Tank pro Stufe (multiplikativ).',            base: 1, growth: 1.35, max: 30,  per: 0.05, mult: true },
-  { id: 'dm_start',  name: 'Frühstart',     icon: '🚀', desc: '+10 % Startgröße pro Stufe (multiplikativ).',         base: 2, growth: 1.3,  max: 60,  per: 0.1, mult: true },
-  { id: 'dm_chaos',  name: 'Chaostheorie',  icon: '🌀', desc: '+10 % ☠ Chaos pro Stufe (multiplikativ).',            base: 1, growth: 1.24, max: 150, per: 0.1, mult: true },
+  { id: 'dm_scrap',  name: 'Schwarzgeld',   icon: '💸', desc: '+20 % Schrott pro Stufe (multiplikativ, für immer).', base: 1, growth: 1.19, max: 200, per: 0.2, mult: true },
+  { id: 'dm_power',  name: 'Wutkern',       icon: '❤️‍🔥', desc: '+10 % Schaden pro Stufe (multiplikativ).',          base: 1, growth: 1.19, max: 200, per: 0.1, mult: true },
+  { id: 'dm_growth', name: 'Mutagen',       icon: '🧪', desc: '+5 % Wachstum pro Stufe (multiplikativ).',            base: 2, growth: 1.18, max: 150, per: 0.05, mult: true },
+  { id: 'dm_rage',   name: 'Ewiger Zorn',   icon: '🌋', desc: '+5 % Wut-Tank pro Stufe (multiplikativ).',            base: 1, growth: 1.26, max: 30,  per: 0.05, mult: true },
+  { id: 'dm_start',  name: 'Frühstart',     icon: '🚀', desc: '+10 % Startgröße pro Stufe (multiplikativ).',         base: 2, growth: 1.225, max: 60,  per: 0.1, mult: true },
+  { id: 'dm_chaos',  name: 'Chaostheorie',  icon: '🌀', desc: '+10 % ☠ Chaos pro Stufe (multiplikativ).',            base: 1, growth: 1.18, max: 150, per: 0.1, mult: true },
   { id: 'dm_mut',    name: 'Genlabor',      icon: '🧬', desc: 'Starte jeden Run mit einer zufälligen Mutation (pro Stufe eine mehr).', base: 5, growth: 3, max: 3, per: 1 },
+  { id: 'dm_boss',   name: 'Höllenjäger',   icon: '😈', desc: 'Nur gegen ZORNOS: +5 % Schaden und −2 % erlittener Schaden pro Stufe.', base: 3, growth: 1.4, max: 20, per: 0.05, guard: 0.02 },
   { id: 'dm_keep',   name: 'Schurken-Erbe', icon: '👑', desc: 'Nach dem Urknall behältst du 10 % deiner Upgrade-Stufen pro Stufe.', base: 4, growth: 2.2, max: 5, per: 0.1 },
 ];
 

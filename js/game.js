@@ -1,7 +1,7 @@
 // =====================================================================
 //  RAGEVERSE – Spiel-Logik (Simulation, keine Grafik)
 // =====================================================================
-import * as C from './config.js?v=0.8.9';
+import * as C from './config.js?v=0.9.0';
 
 const TAU = Math.PI * 2;
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -36,7 +36,7 @@ export function prestigeGain(save) {
   const P = C.PRESTIGE, w = save.cycleBest || 0;
   if (w < P.minWorld) return 0;
   const lg = Math.max(0, Math.log10(Math.max(1, save.cycleScrap || 0)) - P.logBase);
-  return 5 + Math.floor(lg * lg * 3 * (1 + (w - P.minWorld) * P.worldBonus)); // +5 Grundbonus, damit sich schon der erste Urknall lohnt
+  return Math.floor((5 + lg * lg * 3 * (1 + (w - P.minWorld) * P.worldBonus)) * (P.gainMult || 1)); // +5 Grundbonus, damit sich schon der erste Urknall lohnt
 }
 export function doPrestige(save) {
   const gain = prestigeGain(save);
@@ -100,6 +100,7 @@ export function computeStats(save, muts = [], charId = save.selectedChar) {
   const sg = st => (sig && sig.stat === st ? tr('sig') * sig.per : 0);
   return {
     startRadius: P.startRadius * U('size') * pk('size') * (1 + dm('dm_start')),
+    bossDmg: 1 + dm('dm_boss'), bossGuard: 1 - dmLevel(save, 'dm_boss') * dmDef('dm_boss').guard, // Masterplan „Höllenjäger“ (wirkt nach der Stauchung)
     rageMax: P.rageMax * U('rage') * pk('rage') * (1 + dm('dm_rage')) * Math.pow(1.05, cnt('b_rage')) * (1 + sg('rage')),
     rageDrain: P.rageDrain * Math.pow(1 - per('calm'), L('calm')) * (has('zen') ? 0.7 : 1),
     damage: P.damage * U('dmg') * (has('spikes') ? 1.6 : 1) * pk('damage') * (1 + dm('dm_power')) * Math.pow(1.04, cnt('b_dmg')) * (1 + tr('power') * C.TALENTS[0].per + sg('damage')),
@@ -742,7 +743,7 @@ export class Game {
     const hurt = (pct, nx, ny) => {
       if (p.hurtCd > 0) return;
       // Schutz wirkt gegen den Boss nur abgeschwächt (Wurzel), Berserker halbiert statt unverwundbar
-      const m = Math.sqrt(S.hazardMult) * (p.berserkT > 0 ? 0.5 : 1);
+      const m = Math.sqrt(S.hazardMult) * (p.berserkT > 0 ? 0.5 : 1) * (S.bossGuard || 1);
       p.rage -= S.rageMax * pct / 100 * m; p.hurtT = 0.45; p.hurtCd = 0.8; this.shake = Math.min(1.5, this.shake + 0.7);
       p.vx = nx * maxV * 2.4; p.vy = ny * maxV * 2.4; this.sfx('hurt');
       this.text(p.x, p.y - p.r * 2.2, 'AUA! −' + Math.round(pct * m) + '% Wut', '#ff5a5a', 1, p.r * 0.8, true);
@@ -802,7 +803,7 @@ export class Game {
   // damit der Kampf immer ein Kampf bleibt: Upgrades machen ihn schneller, aber nie zur Sekundensache.
   bossPower() {
     const B = C.BOSS, need = (this.boss && this.boss.need) || this.hpScale(this.world) / 1.6;
-    return clamp(Math.pow(this.stats.damage / need, B.powerExp), B.powerMin, B.powerMax);
+    return clamp(Math.pow(this.stats.damage / need, B.powerExp), B.powerMin, B.powerMax) * (this.stats.bossDmg || 1);
   }
   bossDamageNeed() { return this.stats.damage / this.bossPower(); }
 

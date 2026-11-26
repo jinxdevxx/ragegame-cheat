@@ -1,12 +1,12 @@
 // =====================================================================
 //  RAGEVERSE – Einstieg: Game-Loop, Steuerung, Menüs, Shop, Updates
 // =====================================================================
-import * as C from './config.js?v=0.8.9';
-import { monsterData, talentRank, talentFree, canRaiseTalent, raiseTalent, Game, computeStats, upgradeLevel, upgradeCost, fmt, money, tierOf, charDef, mapDef, dmLevel, dmCost, prestigeGain, doPrestige } from './game.js?v=0.8.9';
-import { render, drawMonsterPreview, prewarm420 } from './render.js?v=0.8.9';
-import { initAudio, setMuted, setMusic, setIntensity, setVolumes, sfx } from './audio.js?v=0.8.9';
-import { loadSave, writeSave, listSlots, loadSlotInto, createSlot, deleteSlot, getSlot, loadMeta } from './save.js?v=0.8.9';
-import { PATCH_NOTES, VERSION } from './patchnotes.js?v=0.8.9';
+import * as C from './config.js?v=0.9.0';
+import { monsterData, talentRank, talentFree, canRaiseTalent, raiseTalent, Game, computeStats, upgradeLevel, upgradeCost, fmt, money, tierOf, charDef, mapDef, dmLevel, dmCost, prestigeGain, doPrestige } from './game.js?v=0.9.0';
+import { render, drawMonsterPreview, prewarm420 } from './render.js?v=0.9.0';
+import { initAudio, setMuted, setMusic, setIntensity, setVolumes, sfx } from './audio.js?v=0.9.0';
+import { loadSave, writeSave, listSlots, loadSlotInto, createSlot, deleteSlot, getSlot, loadMeta } from './save.js?v=0.9.0';
+import { PATCH_NOTES, VERSION } from './patchnotes.js?v=0.9.0';
 
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -622,7 +622,7 @@ function renderBang() {
   const perks = C.DM_PERKS.map(d => {
     const l = dmLevel(save, d.id), maxed = l >= d.max, cost = dmCost(d, l), can = !maxed && (save.darkMatter || 0) >= cost;
     const mx = maxBuy(l, d.max, save.darkMatter || 0, k => dmCost(d, k));
-    const eff = d.id === 'dm_mut' ? `${l} Start-Mutation${l === 1 ? '' : 'en'}` : d.id === 'dm_keep' ? `behält ${Math.round(l * d.per * 100)} % der Stufen` : `+${Math.round(l * d.per * 100)} %`;
+    const eff = d.id === 'dm_mut' ? `${l} Start-Mutation${l === 1 ? '' : 'en'}` : d.id === 'dm_keep' ? `behält ${Math.round(l * d.per * 100)} % der Stufen` : d.id === 'dm_boss' ? `+${Math.round(l * d.per * 100)} % Schaden · −${Math.round(l * d.guard * 100)} % erlitten` : `+${Math.round(l * d.per * 100)} %`;
     return `<div class="upg dmp ${can ? 'can' : ''}">
       <div class="upg-top"><div class="upg-icon">${d.icon}</div><div class="upg-txt"><div class="upg-name">${d.name} <span class="lv">Lv ${l}/${d.max}</span></div><div class="upg-lvl">${eff}</div></div></div>
       <div class="upg-desc">${d.desc}</div>
