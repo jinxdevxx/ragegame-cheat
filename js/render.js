@@ -3,9 +3,9 @@
 //  Reihenfolge: Boden → Trümmer-Flecken → Schatten/Objekte/Monster
 //  (nach Tiefe sortiert) → Trümmer → Münzen → Effekte → Overlays
 // =====================================================================
-import { SPRITES, OUT } from './sprites.js?v=0.8.2';
-import { drawMonster } from './monster.js?v=0.8.2';
-import { shadeHex as sh, shadeHex } from './game.js?v=0.8.2';
+import { SPRITES, OUT } from './sprites.js?v=0.8.3';
+import { drawMonster } from './monster.js?v=0.8.3';
+import { shadeHex as sh, shadeHex } from './game.js?v=0.8.3';
 
 const TAU = Math.PI * 2;
 const STARS = Array.from({ length: 220 }, () => ({ x: Math.random(), y: Math.random(), s: Math.random() * 1.8 + 0.4, p: Math.random() * 0.6 + 0.1, tw: Math.random() * 6 }));
@@ -212,17 +212,69 @@ const A = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >
 function gearShape(c, X, Y, r, teeth, rot) { c.beginPath(); for (let i = 0; i < teeth * 2; i++) { const a = rot + i / (teeth * 2) * TAU, rr = i % 2 ? r * 0.8 : r; c.lineTo(X + Math.cos(a) * rr, Y + Math.sin(a) * rr); } c.closePath(); }
 function wavyLine(c, X, Y, w, amp, n) { c.beginPath(); for (let i = 0; i <= n; i++) { const x = X - w / 2 + i / n * w; c.lineTo(x, Y + Math.sin(i / n * TAU * 2) * amp); } c.stroke(); }
 
-// Karte 420: langsam ziehende Rauchschwaden (in Weltkoordinaten, wenige weiche Wolken)
-function drift420(k) {
-  const { c, sx, sy, z, S, time } = k, C = S * 9, v = k.v;
-  cells(v, C, (ix, iy) => {
-    if (hash(ix, iy, 31) > 0.45) return;
-    const x = (ix + hash(ix, iy, 32)) * C + Math.sin(time * 0.15 + ix) * S * 2 + time * S * 0.25, y = (iy + hash(iy, ix, 33)) * C + Math.cos(time * 0.12 + iy) * S;
-    const X = sx(x % (C * 1e6)), Y = sy(y), R = S * z * (2.5 + hash(ix, iy, 34) * 2);
-    const g = c.createRadialGradient(X, Y, 0, X, Y, R); g.addColorStop(0, 'rgba(235,255,225,0.14)'); g.addColorStop(0.6, 'rgba(235,255,225,0.06)'); g.addColorStop(1, 'rgba(235,255,225,0)');
-    c.fillStyle = g; c.beginPath(); c.ellipse(X, Y, R * 1.4, R, 0, 0, TAU); c.fill();
-  });
+// =====================================================================
+// Karte 420: Plantage im Abendlicht. Die Landschaft wird EINMAL als nahtlose
+// Kachel (1024 px) gemalt und dann nur als Muster über den Boden gelegt –
+// zwei Größenstufen blenden beim Wachsen weich ineinander. Pro Frame: 2 Musterflächen,
+// ein paar Rauchwolken-Bilder und Glühwürmchen. Keine Neuaufbau-Spitzen.
+// =====================================================================
+let tile420 = null, smoke420 = null;
+function make420Tile() {
+  const N = 1024, cv = document.createElement('canvas'); cv.width = cv.height = N; const c = cv.getContext('2d');
+  let sd = 4207; const rnd = () => { sd = (sd * 16807) % 2147483647; return sd / 2147483647; };
+  const wrap = (fn) => { for (const dx of [-N, 0, N]) for (const dy of [-N, 0, N]) { c.save(); c.translate(dx, dy); fn(); c.restore(); } };
+  // sattes Gras mit Struktur
+  c.fillStyle = '#3d8a2c'; c.fillRect(0, 0, N, N);
+  for (let i = 0; i < 1400; i++) { const x = rnd() * N, y = rnd() * N, r = 4 + rnd() * 16, col = rnd() < 0.5 ? 'rgba(90,170,60,0.35)' : 'rgba(30,80,20,0.3)'; wrap(() => { c.fillStyle = col; c.beginPath(); c.ellipse(x, y, r, r * 0.6, rnd() * 3, 0, TAU); c.fill(); }); }
+  // Erdwege (horizontal) mit Kieseln und Blättern
+  const rows = [0, 256, 512, 768];
+  for (const y0 of rows) {
+    const gy = y0 + 18, h = 86;
+    c.fillStyle = '#7a4a2c'; c.fillRect(0, gy, N, h); c.fillStyle = '#946038'; c.fillRect(0, gy + 6, N, h - 12);
+    c.fillStyle = 'rgba(0,0,0,0.18)'; c.fillRect(0, gy, N, 6); c.fillStyle = 'rgba(255,230,190,0.12)'; c.fillRect(0, gy + h - 8, N, 4);
+    for (let i = 0; i < 70; i++) { const x = rnd() * N, y = gy + 10 + rnd() * (h - 20); c.fillStyle = rnd() < 0.5 ? '#b08a64' : '#5e3a22'; c.beginPath(); c.ellipse(x, y, 2 + rnd() * 4, 1.5 + rnd() * 2.5, rnd() * 3, 0, TAU); c.fill(); }
+    for (let i = 0; i < 6; i++) { const x = rnd() * N, y = gy + 14 + rnd() * (h - 28); wrap(() => hempLeaf(c, x, y, 14 + rnd() * 8, rnd() * TAU, 'rgba(70,140,40,0.85)', 'rgba(170,220,120,0.5)')); }
+    for (let x = 0; x < N; x += 9) { const hh = 6 + rnd() * 9; c.strokeStyle = 'rgba(40,110,30,0.9)'; c.lineWidth = 2; c.beginPath(); c.moveTo(x, gy + 1); c.lineTo(x + 2, gy - hh); c.stroke(); c.beginPath(); c.moveTo(x + 4, gy + h - 1); c.lineTo(x + 2, gy + h + hh * 0.6); c.stroke(); }
+  }
+  // Pflanzenreihen: zwei Reihen zwischen den Wegen, versetzt
+  for (const y0 of rows) for (let x = (y0 / 256) % 2 ? 85 : 0; x < N + 85; x += 170) {
+    const X = x + (rnd() - 0.5) * 14, Y = y0 + 186 + (rnd() - 0.5) * 8, u = 128 + rnd() * 18, sdd = rnd();
+    wrap(() => { const g = c.createRadialGradient(X + 12, Y + 16, 0, X + 12, Y + 16, u * 0.6); g.addColorStop(0, 'rgba(10,30,5,0.28)'); g.addColorStop(1, 'rgba(10,30,5,0)'); c.fillStyle = g; c.beginPath(); c.arc(X + 12, Y + 16, u * 0.6, 0, TAU); c.fill(); hempPlant(c, X, Y, u, sdd); });
+  }
+  return cv;
 }
+function makeSmoke() {
+  const N = 256, cv = document.createElement('canvas'); cv.width = cv.height = N; const c = cv.getContext('2d');
+  for (const [x, y, r] of [[128, 140, 90], [80, 120, 60], [175, 115, 66], [120, 90, 58]]) { const g = c.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, 'rgba(240,255,235,0.5)'); g.addColorStop(1, 'rgba(240,255,235,0)'); c.fillStyle = g; c.fillRect(0, 0, N, N); }
+  return cv;
+}
+function draw420(k) {
+  const { c, z, W, H, g, time } = k;
+  if (!tile420) { tile420 = make420Tile(); smoke420 = makeSmoke(); }
+  const r = Math.max(10, g.p ? g.p.r : 10), lg = Math.log(r) / Math.log(4), step = Math.floor(lg), frac = lg - step;
+  const ox = k.sx(0), oy = k.sy(0);
+  c.fillStyle = '#3d8a2c'; c.fillRect(0, 0, W, H);
+  // zwei Größenstufen (Kachel = 26 Weltradien der jeweiligen Stufe), weich überblendet
+  const bl = Math.max(0, (frac - 0.8) / 0.2), mix = bl * bl * (3 - 2 * bl); // nur kurz vor dem Größensprung überblenden
+  for (const [st, a] of [[step, 1 - mix], [step + 1, mix]]) {
+    if (a < 0.02) continue;
+    const S = Math.pow(4, st) * 0.8, tw = S * 40 * z, pat = c.createPattern(tile420, 'repeat');
+    pat.setTransform(new DOMMatrix([tw / 1024, 0, 0, tw / 1024, ox % tw, oy % tw]));
+    c.globalAlpha = a; c.fillStyle = pat; c.fillRect(0, 0, W, H);
+  }
+  c.globalAlpha = 1;
+  // Abendlicht: warmer Schimmer oben, Vignette am Rand
+  const gl = c.createLinearGradient(0, 0, 0, H); gl.addColorStop(0, 'rgba(255,190,90,0.18)'); gl.addColorStop(0.45, 'rgba(255,190,90,0)'); gl.addColorStop(1, 'rgba(40,10,60,0.12)');
+  c.fillStyle = gl; c.fillRect(0, 0, W, H);
+  // Rauchwolken (fertige Bilder) ziehen langsam vorbei
+  for (let i = 0; i < 6; i++) { const t = time * 0.025 + i * 0.37, x = ((t + i * 0.13) % 1.3 - 0.15) * W, y = (0.15 + ((i * 0.29) % 0.8)) * H + Math.sin(time * 0.3 + i) * 20, sz = Math.min(W, H) * (0.45 + (i % 3) * 0.15);
+    c.globalAlpha = 0.14; c.drawImage(smoke420, x - sz / 2, y - sz / 2, sz, sz); }
+  c.globalAlpha = 1;
+  // Glühwürmchen
+  for (let i = 0; i < 26; i++) { const ph = time * 0.4 + i * 1.7, x = ((Math.sin(i * 12.9) * 0.5 + 0.5) * W + Math.sin(ph) * 40) % W, y = ((Math.cos(i * 7.3) * 0.5 + 0.5) * H + Math.cos(ph * 0.8) * 30) % H, a = 0.4 + 0.6 * Math.max(0, Math.sin(time * 2 + i));
+    c.fillStyle = `rgba(255,240,140,${a * 0.25})`; c.beginPath(); c.arc(x, y, 7, 0, TAU); c.fill(); c.fillStyle = `rgba(255,250,200,${a})`; c.beginPath(); c.arc(x, y, 2, 0, TAU); c.fill(); }
+}
+
 // Hanfblatt für die Boden-Deko (ohne Umriss): 7 schmale, spitze, gezackte Fiederblätter mit heller Mittelrippe
 function hempLeaflet(c, X, Y, L, W, ang) {
   const ca = Math.cos(ang), sa = Math.sin(ang), n = 9, pts = [];
@@ -243,7 +295,7 @@ function hempLeaf(c, X, Y, size, rot, col, vein) {
 // ganze Pflanze von oben: Fächerblätter im Kreis + Blüte (Cola) in der Mitte
 function hempPlant(c, X, Y, u, seed) {
   const rot = seed * TAU, dark = '#24611f', mid = '#3b8a2e', light = '#5aac3e';
-  c.fillStyle = 'rgba(15,40,10,0.35)'; c.beginPath(); c.arc(X + u * 0.06, Y + u * 0.08, u * 0.62, 0, TAU); c.fill();
+  c.fillStyle = 'rgba(15,40,10,0.18)'; c.beginPath(); c.arc(X + u * 0.06, Y + u * 0.08, u * 0.5, 0, TAU); c.fill();
   for (let i = 0; i < 6; i++) hempLeaf(c, X, Y, u * 0.58, rot + i * TAU / 6, i % 2 ? dark : mid, 'rgba(160,220,120,0.35)');
   for (let i = 0; i < 5; i++) hempLeaf(c, X, Y, u * 0.36, rot + 0.5 + i * TAU / 5, light, 'rgba(200,240,160,0.4)');
   c.fillStyle = '#8fd06a'; c.beginPath(); c.arc(X, Y, u * 0.12, 0, TAU); c.fill();
@@ -624,10 +676,10 @@ const GROUNDS = {
   // ---------------- Dimensionen: jede mit eigenem Thema (DIM_GROUND unten)
   dimension(k) {
     const { c, z, world, time } = k, T = DIM_GROUND[world.theme] || DIM_GROUND.crystal;
+    if (world.theme === 'hemp') return draw420(k); // Karte 420: vorgefertigte Kachel (schnell, keine Neuaufbau-Spitzen)
     if (T.space) drawSpace(c, k.g, k.W, k.H, z, world, time);
     else { c.fillStyle = T.bg ? T.bg(world.pal) : world.pal[0]; c.fillRect(0, 0, k.W, k.H); }
     cached(k, 'dim-' + world.theme + ':' + k.S, kk => T.paint(kk, world.pal, k.S, 70 + (world.minRadius % 97)));
-    if (world.theme === 'hemp') drift420(k);
   },
 
   // ---------------- Höllenschlund (Welt 50): Obsidian, Asche, Lavaflüsse, aufsteigende Glut

@@ -6,6 +6,16 @@
 
 export const PATCH_NOTES = [
   {
+    version: '0.8.3',
+    date: '2026-11-26',
+    title: 'Plantage im Abendlicht',
+    summary: 'Die Easter-Egg-Karte hat ein komplett neues Design – und läuft auch komplett ausgemaxt flüssig.',
+    changes: [
+      'Neues Design: Hanfplantage im Abendlicht – buschige Hanfpflanzen in Reihen, breite Erdwege mit Kieseln und Blättern, warmes Licht, Glühwürmchen und sanfte Rauchwolken.',
+      'Performance: Die Landschaft wird nur noch einmal gemalt und dann als Muster gelegt. Ausgemaxt vorher ~23 FPS mit Rucklern bis über 1 Sekunde, jetzt ~50 FPS ohne Ruckler.',
+    ],
+  },
+  {
     version: '0.8.2',
     date: '2026-11-26',
     title: 'Grow-Räume',
