@@ -3,9 +3,9 @@
 //  Reihenfolge: Boden → Trümmer-Flecken → Schatten/Objekte/Monster
 //  (nach Tiefe sortiert) → Trümmer → Münzen → Effekte → Overlays
 // =====================================================================
-import { SPRITES, OUT } from './sprites.js?v=0.8.1';
-import { drawMonster } from './monster.js?v=0.8.1';
-import { shadeHex as sh, shadeHex } from './game.js?v=0.8.1';
+import { SPRITES, OUT } from './sprites.js?v=0.8.2';
+import { drawMonster } from './monster.js?v=0.8.2';
+import { shadeHex as sh, shadeHex } from './game.js?v=0.8.2';
 
 const TAU = Math.PI * 2;
 const STARS = Array.from({ length: 220 }, () => ({ x: Math.random(), y: Math.random(), s: Math.random() * 1.8 + 0.4, p: Math.random() * 0.6 + 0.1, tw: Math.random() * 6 }));
@@ -212,6 +212,17 @@ const A = (hex, a) => { const n = parseInt(hex.slice(1), 16); return `rgba(${n >
 function gearShape(c, X, Y, r, teeth, rot) { c.beginPath(); for (let i = 0; i < teeth * 2; i++) { const a = rot + i / (teeth * 2) * TAU, rr = i % 2 ? r * 0.8 : r; c.lineTo(X + Math.cos(a) * rr, Y + Math.sin(a) * rr); } c.closePath(); }
 function wavyLine(c, X, Y, w, amp, n) { c.beginPath(); for (let i = 0; i <= n; i++) { const x = X - w / 2 + i / n * w; c.lineTo(x, Y + Math.sin(i / n * TAU * 2) * amp); } c.stroke(); }
 
+// Karte 420: langsam ziehende Rauchschwaden (in Weltkoordinaten, wenige weiche Wolken)
+function drift420(k) {
+  const { c, sx, sy, z, S, time } = k, C = S * 9, v = k.v;
+  cells(v, C, (ix, iy) => {
+    if (hash(ix, iy, 31) > 0.45) return;
+    const x = (ix + hash(ix, iy, 32)) * C + Math.sin(time * 0.15 + ix) * S * 2 + time * S * 0.25, y = (iy + hash(iy, ix, 33)) * C + Math.cos(time * 0.12 + iy) * S;
+    const X = sx(x % (C * 1e6)), Y = sy(y), R = S * z * (2.5 + hash(ix, iy, 34) * 2);
+    const g = c.createRadialGradient(X, Y, 0, X, Y, R); g.addColorStop(0, 'rgba(235,255,225,0.14)'); g.addColorStop(0.6, 'rgba(235,255,225,0.06)'); g.addColorStop(1, 'rgba(235,255,225,0)');
+    c.fillStyle = g; c.beginPath(); c.ellipse(X, Y, R * 1.4, R, 0, 0, TAU); c.fill();
+  });
+}
 // Hanfblatt für die Boden-Deko (ohne Umriss): 7 schmale, spitze, gezackte Fiederblätter mit heller Mittelrippe
 function hempLeaflet(c, X, Y, L, W, ang) {
   const ca = Math.cos(ang), sa = Math.sin(ang), n = 9, pts = [];
@@ -406,15 +417,23 @@ const DIM_GROUND = {
   hemp: { bg: p => '#3a2a1c', paint(kk, p, S, sd) {
     const c = kk.c, C = S * 2.2, sc = S * 14;
     const zone = (x, y) => fbm(x / sc, y / sc, sd + 3);
+    const room = (x, y) => fbm(x / (sc * 0.8), y / (sc * 0.8), sd + 17) > 0.66;
     // Lichtungen (Gras) und Teiche
     terrain(kk, sc, sd + 3, [{ t: 0.63, color: '#4f9a38', rim: '#3a7a28' }, { t: 0.0, t2: 0.15, color: '#3d7fb0', rim: '#2b5f86' }]);
     // Erd-Furchen in den Beeten
     cells(kk.v, C, (ix, iy) => { const x = ix * C, y = iy * C, f = zone(x, y); if (f > 0.63 || f < 0.15) return;
       const X = kk.sx(x), Y = kk.sy(y), w = C * kk.z;
+      if (room(x, y)) return;
       if (iy % 3 === 0) { c.fillStyle = '#9a7a52'; c.fillRect(X - 0.5, Y + w * 0.2, w + 1, w * 0.6); c.fillStyle = 'rgba(0,0,0,0.12)'; c.fillRect(X - 0.5, Y + w * 0.2, w + 1, w * 0.07); return; } // Weg
       c.fillStyle = 'rgba(0,0,0,0.14)'; c.fillRect(X - 0.5, Y + w * 0.45, w + 1, w * 0.08); });
+    // Grow-Räume: dunkler Boden mit Fliesen, lila Grow-Licht, Pflanzen in Töpfen
+    cells(kk.v, C, (ix, iy) => { const x = ix * C, y = iy * C; if (!room(x, y)) return; const X = kk.sx(x), Y = kk.sy(y), w = C * kk.z;
+      c.fillStyle = (ix + iy) % 2 ? '#24202c' : '#2a2534'; c.fillRect(X - 0.5, Y - 0.5, w + 1, w + 1);
+      const g = c.createRadialGradient(X + w / 2, Y + w / 2, 0, X + w / 2, Y + w / 2, w * 0.75); g.addColorStop(0, 'rgba(220,120,255,0.45)'); g.addColorStop(1, 'rgba(160,60,255,0)'); c.fillStyle = g; c.fillRect(X - w * 0.25, Y - w * 0.25, w * 1.5, w * 1.5);
+      c.fillStyle = '#6a4a3a'; c.beginPath(); c.arc(X + w / 2, Y + w / 2, w * 0.2, 0, TAU); c.fill(); c.fillStyle = '#3a2a20'; c.beginPath(); c.arc(X + w / 2, Y + w / 2, w * 0.15, 0, TAU); c.fill();
+      hempPlant(c, X + w / 2, Y + w / 2, w * 0.62, hash(ix, iy, 19)); });
     // Pflanzenreihen
-    cells(kk.v, C, (ix, iy) => { if (iy % 3 === 0) return; const x = ix * C, y = iy * C, f = zone(x, y); if (f > 0.63 || f < 0.17) return;
+    cells(kk.v, C, (ix, iy) => { if (iy % 3 === 0) return; const x = ix * C, y = iy * C, f = zone(x, y); if (f > 0.63 || f < 0.17 || room(x, y)) return;
       hempPlant(c, kk.sx(x + C / 2 + (hash(ix, iy, 5) - 0.5) * C * 0.15), kk.sy(y + C / 2), C * kk.z * (0.82 + hash(ix, iy, 6) * 0.25), hash(ix, iy, 7)); });
     // große einzelne Blätter auf den Lichtungen
     scatter(kk, S * 3.5, 0.5, 244, (X, Y, u, h, x, y) => { if (zone(x, y) < 0.66) return; hempLeaf(c, X, Y, u * 0.35, h * TAU, 'rgba(40,110,35,0.55)', 'rgba(150,210,110,0.4)'); });
@@ -608,6 +627,7 @@ const GROUNDS = {
     if (T.space) drawSpace(c, k.g, k.W, k.H, z, world, time);
     else { c.fillStyle = T.bg ? T.bg(world.pal) : world.pal[0]; c.fillRect(0, 0, k.W, k.H); }
     cached(k, 'dim-' + world.theme + ':' + k.S, kk => T.paint(kk, world.pal, k.S, 70 + (world.minRadius % 97)));
+    if (world.theme === 'hemp') drift420(k);
   },
 
   // ---------------- Höllenschlund (Welt 50): Obsidian, Asche, Lavaflüsse, aufsteigende Glut
@@ -1156,6 +1176,8 @@ function drawObject(c, g, o, X, Y, R, limit, time, hasFilter) {
   // Treffer-Blitz: weißer Schimmer über der Form
   if (o.flash > 0.05) { c.globalAlpha = o.flash * 0.6; c.fillStyle = '#ffffff'; c.beginPath(); c.ellipse(0, 0, 0.95, 0.95, 0, 0, Math.PI * 2); c.fill(); c.globalAlpha = 1; }
   c.restore();
+  // Karte 420: goldene Blätter leuchten, damit man sie zwischen den Pflanzen findet
+  if (o.leaf) { const pu = 0.6 + 0.4 * Math.sin(time * 5 + o.seed * 9), gr = c.createRadialGradient(X, Y - R * 0.3, R * 0.2, X, Y - R * 0.3, R * 2.2); gr.addColorStop(0, `rgba(255,230,90,${0.55 * pu})`); gr.addColorStop(1, 'rgba(255,230,90,0)'); c.fillStyle = gr; c.beginPath(); c.arc(X, Y - R * 0.3, R * 2.2, 0, TAU); c.fill(); }
   // Funkeln goldener Objekte / Kisten
   if (o.golden || o.crate) {
     const t = time * 3 + o.seed * 10;

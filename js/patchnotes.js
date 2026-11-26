@@ -6,6 +6,17 @@
 
 export const PATCH_NOTES = [
   {
+    version: '0.8.2',
+    date: '2026-11-26',
+    title: 'Grow-Räume',
+    summary: 'Die Easter-Egg-Karte sieht noch besser aus.',
+    changes: [
+      'Neue Grow-Räume mit lila Grow-Licht und Pflanzen in Töpfen zwischen den Feldern.',
+      'Rauchschwaden ziehen jetzt langsam über die Karte.',
+      'Goldene Blätter leuchten, damit man sie zwischen den Pflanzen besser findet.',
+    ],
+  },
+  {
     version: '0.8.1',
     date: '2026-11-26',
     title: 'Skills mit Sinn',
